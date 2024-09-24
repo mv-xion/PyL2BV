@@ -1,0 +1,28 @@
+Output folder already exists. Folder was overwritten.
+Tile: CHI_E2ES_PRO_L2VIMG_20230323T094552Z_20240814T153802Z_0001.nc
+Image read. Elapsed time:0.20388269424438477
+Getting model 3 names was successful.
+CCC_GPR_ARTMO_20PC imported
+CWC_GPR_ARTMO_20PC imported
+LAI_GPR_ARTMO_20PC imported
+Running CCC_GPR_ARTMO_20PC model
+No matching bands found, spline interpolation is applied.
+Image read.Bands selected. Shape: (300, 300, 235) 
+Elapsed time: 23.01254105567932
+Elapsed time of GPR: 15.606451988220215
+Retrieval of CCC was successful.
+Running CWC_GPR_ARTMO_20PC model
+No matching bands found, spline interpolation is applied.
+Image read.Bands selected. Shape: (300, 300, 198) 
+Elapsed time: 29.869302988052368
+Elapsed time of GPR: 35.55578589439392
+Retrieval of CWC was successful.
+Running LAI_GPR_ARTMO_20PC model
+No matching bands found, spline interpolation is applied.
+Image read.Bands selected. Shape: (300, 300, 235) 
+Elapsed time: 21.440362453460693
+Elapsed time of GPR: 28.24408507347107
+Retrieval of LAI was successful.
+NetCDF file created successfully at: C:\Users\ixion\VLC\BioRetrieval\output\CHI_E2ES_PRO_L2VIMG_20230323T094552Z_20240814T153802Z_0001.nc
+Image exported. Elapsed time:0.05696916580200195
+Show imagesRetrieval of CHI_E2ES_PRO_L2VIMG_20230323T094552Z_20240814T153802Z_0001.nc successful.
