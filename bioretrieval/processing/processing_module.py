@@ -9,7 +9,6 @@ from datetime import datetime
 
 from bioretrieval.auxiliar.logger_class import Logger
 from bioretrieval.processing.retrieval import Retrieval
-from bioretrieval.processing.mlra_gpr import GPRMapping
 
 
 def bio_retrieval_module(input_folder_path: str, input_type: str, model_folder_path: str,
@@ -23,6 +22,7 @@ def bio_retrieval_module(input_folder_path: str, input_type: str, model_folder_p
     reads the indicated input_type than starts the retrieval process with the models
     specified in model_folder_path.
     Parameters:
+    :type conversion_factor: conversion factor for the retrieval
     :param input_folder_path: path to folder containing input files
     :param input_type: type of input files
     :param model_folder_path: path to folder containing model files
@@ -178,23 +178,15 @@ def bio_retrieval_module(input_folder_path: str, input_type: str, model_folder_p
 
         # Creating Retrieval object and call function
         retrieval_object = Retrieval(log_file_id, show_message, input_files[i], input_type, l2b_output_files[i],
-                              model_folder_path, conversion_factor)
-        return_value = retrieval_object.bio_retrieval_prepare()
+                                     model_folder_path, conversion_factor)
+        
+        return_value = retrieval_object.bio_retrieval
         if return_value == 1:  # There was an error
             return 1
         else:
-            # Selection of retrieval method
-            if retrieval_object.bio_model[i].model_type == 'GPR':
-                # GPR instance is created to perform gpr
-                gpr_object = GPRMapping(retrieval_object)
-                retrieval_value = gpr_object.perform_GPR()
-
-                if retrieval_value == 1:  # There was an error
-                    return 1
-            else:
-                export_value = retrieval_object.export_retrieval()
-                if export_value == 1:  # There was an error
-                    return 1
+            export_value = retrieval_object.export_retrieval()
+            if export_value == 1:  # There was an error
+                return 1
 
         print(f"Retrieval of {img_name} successful.")
         show_message(f"Retrieval of {img_name} successful.")
@@ -213,8 +205,8 @@ def make_output_folder(output_path: str) -> bool:
     if os.path.exists(output_path):
         shutil.rmtree(output_path)
         os.makedirs(output_path)
-        flag_out = 1
+        flag_out = True
     else:
         os.makedirs(output_path)
-        flag_out = 0
+        flag_out = False
     return flag_out

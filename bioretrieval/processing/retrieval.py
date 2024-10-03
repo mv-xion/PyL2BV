@@ -3,6 +3,7 @@
     from reading the image to writing the retrieved result
 """
 import importlib
+import pickle
 import sys
 import time
 import os
@@ -14,14 +15,10 @@ from spectral.io import envi
 from bioretrieval.auxiliar.logger_class import Logger
 from bioretrieval.auxiliar.image_read import read_netcdf, read_envi, show_reflectance_img
 from bioretrieval.auxiliar.spectra_interpolation import spline_interpolation
+from bioretrieval.processing.mlra_gpr import MLRA_GPR
 
 
 #from bioretrieval.processing.mlra_gpr import GPR_mapping_parallel
-
-
-# Normalise data function
-def norm_data(data: np.ndarray, mean: float, std: float) -> np.ndarray:
-    return (data - mean) / std
 
 
 class Retrieval:
@@ -39,7 +36,7 @@ class Retrieval:
         """
         self.conversion_factor = conversion_factor
         self.number_of_models = None
-        self.bio_model = []  # Storing the models
+        self.bio_models = []  # Storing the models
         self.variable_maps = []  # Storing variable maps
         self.uncertainty_maps = []  # Storing uncertainty maps
         self.start = None
@@ -59,7 +56,8 @@ class Retrieval:
         self.model_path = model_path
 
     # TODO: Try catch blocks, exceptions
-    def bio_retrieval_prepare(self) -> bool:
+    @property
+    def bio_retrieval(self) -> bool:
         self.logger.open()
         print('Reading image...')
         self.show_message('Reading image...')
@@ -105,7 +103,7 @@ class Retrieval:
             print(e)
             self.show_message(str(e))
             self.logger.log_message(f'{e}\n')
-            return 1
+            return True
         list_of_models = [file for file in list_of_files if file.endswith('.py')]
         self.number_of_models = len(list_of_models)
         print(f"Getting model {self.number_of_models} names was successful.")
@@ -117,19 +115,19 @@ class Retrieval:
         # Reading the models
         for i in range(len(list_of_models)):
             # Importing model
-            self.bio_model.append(
+            self.bio_models.append(
                 importlib.import_module(os.path.splitext(list_of_models[i])[0], package=None))
-            print(f"{self.bio_model[i].model} imported")
-            self.show_message(f"{self.bio_model[i].model} imported")
-            self.logger.log_message(f"{self.bio_model[i].model} imported\n")
+            print(f"{self.bio_models[i].model} imported")
+            self.show_message(f"{self.bio_models[i].model} imported")
+            self.logger.log_message(f"{self.bio_models[i].model} imported\n")
 
         # _________________________________Retrieval___________________________________________
 
         for i in range(self.number_of_models):
             # Running each model on the image
-            print(f'Running {self.bio_model[i].model} model')
-            self.show_message(f'Running {self.bio_model[i].model} model')
-            self.logger.log_message(f'Running {self.bio_model[i].model} model\n')
+            print(f'Running {self.bio_models[i].model} model')
+            self.show_message(f'Running {self.bio_models[i].model} model')
+            self.logger.log_message(f'Running {self.bio_models[i].model} model\n')
 
             print('Band selection...')
             self.show_message('Band selection...')
@@ -146,19 +144,50 @@ class Retrieval:
                                     f' \nElapsed time: {self.process_time}\n')
 
             # Normalising the image
-            self.data_norm = norm_data(data_refl_new, self.bio_model[i].mx_GREEN, self.bio_model[i].sx_GREEN)
+            self.data_norm = norm_data(data_refl_new, self.bio_models[i].mx_GREEN, self.bio_models[i].sx_GREEN)
 
             # Perform PCA if there is data
-            if hasattr(self.bio_model[i], 'pca_mat') and len(self.bio_model[i].pca_mat) > 0:
-                self.data_norm = self.data_norm.dot(self.bio_model[i].pca_mat)
+            if hasattr(self.bio_models[i], 'pca_mat') and len(self.bio_models[i].pca_mat) > 0:
+                self.data_norm = self.data_norm.dot(self.bio_models[i].pca_mat)
+
+            if self.bio_models[i].model_type == 'GPR':
+                # Changing axes to because GPR function takes dim,y,x
+                self.data_norm = np.swapaxes(self.data_norm, 0,
+                                             1)  # swapping axes to have the right order after transpose
+                self.img_array = np.transpose(self.data_norm)
+
+                # Transform model to dictionary
+                model_dict = module_to_dict(self.bio_models[i]) # we dont use it now
+
+                print('Running GPR...')
+                self.show_message('Running GPR...')
+
+                gpr_object = MLRA_GPR(self.img_array, model_dict)
+                self.start = time.time()
+
+                # Starting GPR
+                variable_map, uncertainty_map = gpr_object.perform_mlra
+                self.end = time.time()
+
+                # Logging
+                self.process_time = self.end - self.start
+                print(f'Elapsed time of GPR: {self.process_time}')
+                self.show_message(f'Elapsed time of GPR: {self.process_time}')
+                self.logger.log_message(f'Elapsed time of GPR: {self.process_time}\n')
+                self.variable_maps.append(variable_map)
+                self.uncertainty_maps.append(uncertainty_map)
+
+                print(f'Retrieval of {self.bio_models[i].veg_index} was successful.')
+                self.show_message(f'Retrieval of {self.bio_models[i].veg_index} was successful.')
+                self.logger.log_message(f'Retrieval of {self.bio_models[i].veg_index} was successful.\n')
 
         # _________________________________Finishing tasks_____________________________________
         self.logger.close()
-        return 0
+        return False
 
-    def band_selection(self, i: int) -> list:
+    def band_selection(self, i: int) -> np.ndarray:
         current_wl = self.img_wavelength
-        expected_wl = self.bio_model[i].wave_length
+        expected_wl = self.bio_models[i].wave_length
         # Find the intersection of the two lists of wavelength
         if len(np.intersect1d(current_wl, expected_wl)) == len(expected_wl):
             reflectances_new = self.img_reflectance[:, :, np.where(np.in1d(current_wl, expected_wl))[0]]
@@ -197,7 +226,7 @@ class Retrieval:
         self.show_results()
 
         self.logger.close()
-        return 0
+        return False
 
     def export_netcdf(self):
         # Creating output image
@@ -214,39 +243,39 @@ class Retrieval:
 
         # Create groups
         for i in range(self.number_of_models):
-            group = nc_file.createGroup(self.bio_model[i].veg_index)
-            if self.bio_model[i].veg_index == 'LCC':
+            group = nc_file.createGroup(self.bio_models[i].veg_index)
+            if self.bio_models[i].veg_index == 'LCC':
                 group.long_name = 'Leaf Chlorophyll Content (LCC)'
-            elif self.bio_model[i].veg_index == 'LWC':
+            elif self.bio_models[i].veg_index == 'LWC':
                 group.long_name = 'Leaf Water Content (LWC)'
-            elif self.bio_model[i].veg_index == 'LNC':
+            elif self.bio_models[i].veg_index == 'LNC':
                 group.long_name = 'Leaf Nitrogen Content (LNC)'
-            elif self.bio_model[i].veg_index == 'LMA':
+            elif self.bio_models[i].veg_index == 'LMA':
                 group.long_name = 'Leaf Mass Area (LMA)'
-            elif self.bio_model[i].veg_index == 'LAI':
+            elif self.bio_models[i].veg_index == 'LAI':
                 group.long_name = 'Leaf Area Index (LAI)'
-            elif self.bio_model[i].veg_index == 'CCC':
+            elif self.bio_models[i].veg_index == 'CCC':
                 group.long_name = 'Canopy Chlorophyll Content (CCC)'
-            elif self.bio_model[i].veg_index == 'CWC':
+            elif self.bio_models[i].veg_index == 'CWC':
                 group.long_name = 'Canopy Water Content (CWC)'
-            elif self.bio_model[i].veg_index == 'CDMC':
+            elif self.bio_models[i].veg_index == 'CDMC':
                 group.long_name = 'Canopy Dry Matter Content (CDMC)'
-            elif self.bio_model[i].veg_index == 'CNC':
+            elif self.bio_models[i].veg_index == 'CNC':
                 group.long_name = 'Canopy Nitrogen Content (CNC)'
-            elif self.bio_model[i].veg_index == 'FVC':
+            elif self.bio_models[i].veg_index == 'FVC':
                 group.long_name = 'Fractional Vegetation Cover (FVC)'
-            elif self.bio_model[i].veg_index == 'FAPAR':
+            elif self.bio_models[i].veg_index == 'FAPAR':
                 group.long_name = 'Fraction of Absorbed Photosynthetically Active Radiation (FAPAR)'
 
             # Create dimensions for group
-            Nl_dim = group.createDimension('Nl', self.rows)
-            Nc_dim = group.createDimension('Nc', self.cols)
+            nl_dim = group.createDimension('Nl', self.rows)
+            nc_dim = group.createDimension('Nc', self.cols)
 
             # Create variables for group
             retrieval_var = group.createVariable('Retrieval', 'f4', dimensions=('Nc', 'Nl'))
-            retrieval_var.units = self.bio_model[i].units  # Adding the 'Units' attribute
+            retrieval_var.units = self.bio_models[i].units  # Adding the 'Units' attribute
             sd_var = group.createVariable('SD', 'f4', dimensions=('Nc', 'Nl'))
-            sd_var.units = self.bio_model[i].units
+            sd_var.units = self.bio_models[i].units
             cv_var = group.createVariable('CV', 'f4', dimensions=('Nc', 'Nl'))
             cv_var.units = '%'
             qf_var = group.createVariable('QF', 'i1', dimensions=('Nc', 'Nl'))
@@ -271,8 +300,8 @@ class Retrieval:
         # Construct band names
         band_names = []
         for i in range(self.number_of_models):
-            band_names.append(self.bio_model[i].veg_index)
-            band_names.append(f'{self.bio_model[i].veg_index}_sd')
+            band_names.append(self.bio_models[i].veg_index)
+            band_names.append(f'{self.bio_models[i].veg_index}_sd')
 
         # Define metadata ENVI Standard
         metadata = {
@@ -330,41 +359,73 @@ class Retrieval:
             os.makedirs(vec_dir)
 
         for i in range(self.number_of_models):
-            if self.bio_model[i].veg_index == 'CCC':
+            if self.bio_models[i].veg_index == 'CCC':
                 colormap = 'Greens'
-            elif self.bio_model[i].veg_index == 'CWC':
+            elif self.bio_models[i].veg_index == 'CWC':
                 colormap = 'Blues'
-            elif self.bio_model[i].veg_index == 'LAI':
+            elif self.bio_models[i].veg_index == 'LAI':
                 colormap = 'YlGn'
             else:
                 colormap = 'viridis'
 
             # Showing the result image
             plt.imshow(self.variable_maps[i], cmap=colormap)
-            if self.bio_model[i].veg_index == 'LAI':
-                plt.title(f"Estimated {self.bio_model[i].veg_index} map (m$^2$/m$^2$)")
+            if self.bio_models[i].veg_index == 'LAI':
+                plt.title(f"Estimated {self.bio_models[i].veg_index} map (m$^2$/m$^2$)")
             else:
-                plt.title(f"Estimated {self.bio_model[i].veg_index} map (g/m$^2$)")
+                plt.title(f"Estimated {self.bio_models[i].veg_index} map (g/m$^2$)")
             plt.colorbar()
             plt.tight_layout()
-            plt.savefig(os.path.join(img_dir, f'{os.path.basename(self.output_file)}{self.bio_model[i].veg_index}.png'),
-                        bbox_inches='tight')
-            plt.savefig(os.path.join(vec_dir, f'{os.path.basename(self.output_file)}{self.bio_model[i].veg_index}.pdf'),
-                        bbox_inches='tight')
+            plt.savefig(
+                os.path.join(img_dir, f'{os.path.basename(self.output_file)}{self.bio_models[i].veg_index}.png'),
+                bbox_inches='tight')
+            plt.savefig(
+                os.path.join(vec_dir, f'{os.path.basename(self.output_file)}{self.bio_models[i].veg_index}.pdf'),
+                bbox_inches='tight')
             plt.show()
 
             # Showing the uncertainty image
             plt.imshow(self.uncertainty_maps[i], cmap='jet')
-            if self.bio_model[i].veg_index == 'LAI':
-                plt.title(f"Uncertainty of {self.bio_model[i].veg_index} map (m$^2$/m$^2$)")
+            if self.bio_models[i].veg_index == 'LAI':
+                plt.title(f"Uncertainty of {self.bio_models[i].veg_index} map (m$^2$/m$^2$)")
             else:
-                plt.title(f"Uncertainty of {self.bio_model[i].veg_index} map (g/m$^2$)")
+                plt.title(f"Uncertainty of {self.bio_models[i].veg_index} map (g/m$^2$)")
             plt.colorbar()
             plt.tight_layout()
             plt.savefig(os.path.join(img_dir,
-                                     f'{os.path.basename(self.output_file)}{self.bio_model[i].veg_index}_uncertainty.png'),
+                                     f'{os.path.basename(self.output_file)}{self.bio_models[i].veg_index}_uncertainty.png'),
                         bbox_inches='tight')
             plt.savefig(os.path.join(vec_dir,
-                                     f'{os.path.basename(self.output_file)}{self.bio_model[i].veg_index}_uncertainty.pdf'),
+                                     f'{os.path.basename(self.output_file)}{self.bio_models[i].veg_index}_uncertainty.pdf'),
                         bbox_inches='tight')
             plt.show()
+
+
+# Normalise data function
+def norm_data(data: np.ndarray, mean: float, std: float) -> np.ndarray:
+    return (data - mean) / std
+
+
+# Parallel multiprocess cant pick modules
+def module_to_dict(bio_model) -> dict:
+    """
+    Converts the attributes of an already existing module into a dictionary.
+
+    :param bio_model: The module or object containing hyperparameters
+    :return: Dictionary with the module's attributes
+    """
+    # Convert the module's attributes to a dictionary, excluding special methods/attributes
+    module_dict = {key: value for key, value in vars(bio_model).items() if not key.startswith("__")}
+
+    module_dict = {k: v for k, v in module_dict.items() if is_picklable(v)}
+
+    return module_dict
+
+
+# Function to check if an object is picklable
+def is_picklable(obj):
+    try:
+        pickle.dumps(obj)
+    except (pickle.PicklingError, TypeError):
+        return False
+    return True
