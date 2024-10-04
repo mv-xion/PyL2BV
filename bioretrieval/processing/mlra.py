@@ -2,7 +2,6 @@
 import numpy as np
 
 
-
 class MLRA_Methods:
     def __init__(self, image: np.ndarray, bio_model):
         """
@@ -18,7 +17,3 @@ class MLRA_Methods:
         Prototype method for MLRA. Should be overridden by subclasses.
         """
         raise NotImplementedError("Subclasses should implement this method.")
-
-
-
-

@@ -3,27 +3,39 @@
     from reading the image to writing the retrieved result
 """
 import importlib
+import os
 import pickle
 import sys
 import time
-import os
+
 import netCDF4 as nc
 import numpy as np
 from matplotlib import pyplot as plt
 from spectral.io import envi
 
+from bioretrieval.auxiliar.image_read import (
+    read_envi,
+    read_netcdf,
+    show_reflectance_img,
+)
 from bioretrieval.auxiliar.logger_class import Logger
-from bioretrieval.auxiliar.image_read import read_netcdf, read_envi, show_reflectance_img
 from bioretrieval.auxiliar.spectra_interpolation import spline_interpolation
 from bioretrieval.processing.mlra_gpr import MLRA_GPR
 
-
-#from bioretrieval.processing.mlra_gpr import GPR_mapping_parallel
+# from bioretrieval.processing.mlra_gpr import GPR_mapping_parallel
 
 
 class Retrieval:
-    def __init__(self, logfile: Logger, show_message: callable, input_file: str, input_type: str, output_file: str,
-                 model_path: str, conversion_factor: float):
+    def __init__(
+        self,
+        logfile: Logger,
+        show_message: callable,
+        input_file: str,
+        input_type: str,
+        output_file: str,
+        model_path: str,
+        conversion_factor: float,
+    ):
         """
         Initialise the retrieval class
         :param logfile: path to the log file
@@ -59,56 +71,66 @@ class Retrieval:
     @property
     def bio_retrieval(self) -> bool:
         self.logger.open()
-        print('Reading image...')
-        self.show_message('Reading image...')
+        print("Reading image...")
+        self.show_message("Reading image...")
         self.start = time.time()
-        # __________________________Split image read by file type______________________________
+        # __________________________Split image read by file type______________
 
-        if self.input_type == 'CHIME netCDF':
+        if self.input_type == "CHIME netCDF":
             image_data = read_netcdf(self.input_file, self.conversion_factor)
             self.img_reflectance = image_data[0]  # save reflectance
             self.img_wavelength = image_data[1]  # save wavelength
             self.map_info = False
-        elif self.input_type == 'ENVI Standard':
+        elif self.input_type == "ENVI Standard":
             image_data = read_envi(self.input_file, self.conversion_factor)
             self.img_reflectance = image_data[0]  # save reflectance
             self.img_wavelength = image_data[1]  # save wavelength
             if len(image_data) == 4:
-                self.show_message('Map info included')
+                self.show_message("Map info included")
                 self.map_info = True
                 self.latitude = image_data[2]
                 self.longitude = image_data[3]
             else:
-                self.show_message('No map info')
+                self.show_message("No map info")
                 self.map_info = False
         self.end = time.time()
         self.process_time = self.end - self.start
         self.rows, self.cols, self.dims = self.img_reflectance.shape
 
-        print(f'Image read. Elapsed time:{self.process_time}')
-        self.show_message(f'Image read. Elapsed time:{self.process_time}')
-        self.logger.log_message(f'Image read. Elapsed time:{self.process_time}\n')
+        print(f"Image read. Elapsed time:{self.process_time}")
+        self.show_message(f"Image read. Elapsed time:{self.process_time}")
+        self.logger.log_message(
+            f"Image read. Elapsed time:{self.process_time}\n"
+        )
 
         # Showing image
         show_reflectance_img(self.img_reflectance, self.img_wavelength)
 
-        # ___________________________Reading models___________________________________________
+        # ___________________________Reading models____________________________
 
         # Getting path of the model files
         try:
             list_of_files = os.listdir(self.model_path)
             if not list_of_files:
-                raise FileNotFoundError(f"No models found in path: {self.model_path}")
+                raise FileNotFoundError(
+                    f"No models found in path: {self.model_path}"
+                )
         except Exception as e:
             print(e)
             self.show_message(str(e))
-            self.logger.log_message(f'{e}\n')
+            self.logger.log_message(f"{e}\n")
             return True
-        list_of_models = [file for file in list_of_files if file.endswith('.py')]
+        list_of_models = [
+            file for file in list_of_files if file.endswith(".py")
+        ]
         self.number_of_models = len(list_of_models)
         print(f"Getting model {self.number_of_models} names was successful.")
-        self.show_message(f"Getting model {self.number_of_models} names was successful.")
-        self.logger.log_message(f"Getting model {self.number_of_models} names was successful.\n")
+        self.show_message(
+            f"Getting model {self.number_of_models} names was successful."
+        )
+        self.logger.log_message(
+            f"Getting model {self.number_of_models} names was successful.\n"
+        )
 
         # Importing the models
         sys.path.append(self.model_path)
@@ -116,7 +138,10 @@ class Retrieval:
         for i in range(len(list_of_models)):
             # Importing model
             self.bio_models.append(
-                importlib.import_module(os.path.splitext(list_of_models[i])[0], package=None))
+                importlib.import_module(
+                    os.path.splitext(list_of_models[i])[0], package=None
+                )
+            )
             print(f"{self.bio_models[i].model} imported")
             self.show_message(f"{self.bio_models[i].model} imported")
             self.logger.log_message(f"{self.bio_models[i].model} imported\n")
@@ -125,12 +150,14 @@ class Retrieval:
 
         for i in range(self.number_of_models):
             # Running each model on the image
-            print(f'Running {self.bio_models[i].model} model')
-            self.show_message(f'Running {self.bio_models[i].model} model')
-            self.logger.log_message(f'Running {self.bio_models[i].model} model\n')
+            print(f"Running {self.bio_models[i].model} model")
+            self.show_message(f"Running {self.bio_models[i].model} model")
+            self.logger.log_message(
+                f"Running {self.bio_models[i].model} model\n"
+            )
 
-            print('Band selection...')
-            self.show_message('Band selection...')
+            print("Band selection...")
+            self.show_message("Band selection...")
 
             # Band selection of the image
             self.start = time.time()
@@ -138,29 +165,45 @@ class Retrieval:
             self.end = time.time()
             self.process_time = self.end - self.start
 
-            print(f'Bands selected. Shape: {data_refl_new.shape} \nElapsed time: {self.process_time}')
-            self.show_message(f'Bands selected. Shape: {data_refl_new.shape} \nElapsed time: {self.process_time}')
-            self.logger.log_message(f'Image read.Bands selected. Shape: {data_refl_new.shape}'
-                                    f' \nElapsed time: {self.process_time}\n')
+            print(
+                f"Bands selected. Shape: {data_refl_new.shape} \nElapsed time: {self.process_time}"
+            )
+            self.show_message(
+                f"Bands selected. Shape: {data_refl_new.shape} \nElapsed time: {self.process_time}"
+            )
+            self.logger.log_message(
+                f"Image read.Bands selected. Shape: {data_refl_new.shape}"
+                f" \nElapsed time: {self.process_time}\n"
+            )
 
             # Normalising the image
-            self.data_norm = norm_data(data_refl_new, self.bio_models[i].mx_GREEN, self.bio_models[i].sx_GREEN)
+            self.data_norm = norm_data(
+                data_refl_new,
+                self.bio_models[i].mx_GREEN,
+                self.bio_models[i].sx_GREEN,
+            )
 
             # Perform PCA if there is data
-            if hasattr(self.bio_models[i], 'pca_mat') and len(self.bio_models[i].pca_mat) > 0:
+            if (
+                hasattr(self.bio_models[i], "pca_mat")
+                and len(self.bio_models[i].pca_mat) > 0
+            ):
                 self.data_norm = self.data_norm.dot(self.bio_models[i].pca_mat)
 
-            if self.bio_models[i].model_type == 'GPR':
+            if self.bio_models[i].model_type == "GPR":
                 # Changing axes to because GPR function takes dim,y,x
-                self.data_norm = np.swapaxes(self.data_norm, 0,
-                                             1)  # swapping axes to have the right order after transpose
+                self.data_norm = np.swapaxes(
+                    self.data_norm, 0, 1
+                )  # swapping axes to have the right order after transpose
                 self.img_array = np.transpose(self.data_norm)
 
                 # Transform model to dictionary
-                model_dict = module_to_dict(self.bio_models[i]) # we dont use it now
+                model_dict = module_to_dict(
+                    self.bio_models[i]
+                )  # we dont use it now
 
-                print('Running GPR...')
-                self.show_message('Running GPR...')
+                print("Running GPR...")
+                self.show_message("Running GPR...")
 
                 gpr_object = MLRA_GPR(self.img_array, model_dict)
                 self.start = time.time()
@@ -171,17 +214,25 @@ class Retrieval:
 
                 # Logging
                 self.process_time = self.end - self.start
-                print(f'Elapsed time of GPR: {self.process_time}')
-                self.show_message(f'Elapsed time of GPR: {self.process_time}')
-                self.logger.log_message(f'Elapsed time of GPR: {self.process_time}\n')
+                print(f"Elapsed time of GPR: {self.process_time}")
+                self.show_message(f"Elapsed time of GPR: {self.process_time}")
+                self.logger.log_message(
+                    f"Elapsed time of GPR: {self.process_time}\n"
+                )
                 self.variable_maps.append(variable_map)
                 self.uncertainty_maps.append(uncertainty_map)
 
-                print(f'Retrieval of {self.bio_models[i].veg_index} was successful.')
-                self.show_message(f'Retrieval of {self.bio_models[i].veg_index} was successful.')
-                self.logger.log_message(f'Retrieval of {self.bio_models[i].veg_index} was successful.\n')
+                print(
+                    f"Retrieval of {self.bio_models[i].veg_index} was successful."
+                )
+                self.show_message(
+                    f"Retrieval of {self.bio_models[i].veg_index} was successful."
+                )
+                self.logger.log_message(
+                    f"Retrieval of {self.bio_models[i].veg_index} was successful.\n"
+                )
 
-        # _________________________________Finishing tasks_____________________________________
+        # _________________________________Finishing tasks_____________________
         self.logger.close()
         return False
 
@@ -190,39 +241,49 @@ class Retrieval:
         expected_wl = self.bio_models[i].wave_length
         # Find the intersection of the two lists of wavelength
         if len(np.intersect1d(current_wl, expected_wl)) == len(expected_wl):
-            reflectances_new = self.img_reflectance[:, :, np.where(np.in1d(current_wl, expected_wl))[0]]
-            print('Matching bands found.')
-            self.show_message('Matching bands found.')
-            self.logger.log_message('Matching bands found.\n')
+            reflectances_new = self.img_reflectance[
+                :, :, np.where(np.in1d(current_wl, expected_wl))[0]
+            ]
+            print("Matching bands found.")
+            self.show_message("Matching bands found.")
+            self.logger.log_message("Matching bands found.\n")
         else:
-            print('No matching bands found, spline interpolation is applied.')
-            self.show_message('No matching bands found, spline interpolation is applied.')
-            self.logger.log_message('No matching bands found, spline interpolation is applied.\n')
-            reflectances_new = spline_interpolation(current_wl, self.img_reflectance, expected_wl)
+            print("No matching bands found, spline interpolation is applied.")
+            self.show_message(
+                "No matching bands found, spline interpolation is applied."
+            )
+            self.logger.log_message(
+                "No matching bands found, spline interpolation is applied.\n"
+            )
+            reflectances_new = spline_interpolation(
+                current_wl, self.img_reflectance, expected_wl
+            )
 
         return reflectances_new  # returning the selected bands
 
     def export_retrieval(self) -> bool:
         self.logger.open()
-        print('Exporting image...')
-        self.show_message('Exporting image...')
+        print("Exporting image...")
+        self.show_message("Exporting image...")
         self.start = time.time()
-        # __________________________Split image read by file type______________________________
+        # __________________________Split image read by file type______________
 
-        if self.input_type == 'CHIME netCDF':
+        if self.input_type == "CHIME netCDF":
             self.export_netcdf()
-        elif self.input_type == 'ENVI Standard':
+        elif self.input_type == "ENVI Standard":
             self.export_envi()
         self.end = time.time()
         self.process_time = self.end - self.start
 
-        print(f'Image exported. Elapsed time:{self.process_time}')
-        self.show_message(f'Image exported. Elapsed time:{self.process_time}')
-        self.logger.log_message(f'Image exported. Elapsed time:{self.process_time}\n')
+        print(f"Image exported. Elapsed time:{self.process_time}")
+        self.show_message(f"Image exported. Elapsed time:{self.process_time}")
+        self.logger.log_message(
+            f"Image exported. Elapsed time:{self.process_time}\n"
+        )
 
-        print(f'Show images')
-        self.show_message(f'Show images')
-        self.logger.log_message(f'Show images')
+        print(f"Show images")
+        self.show_message(f"Show images")
+        self.logger.log_message(f"Show images")
         self.show_results()
 
         self.logger.close()
@@ -231,55 +292,59 @@ class Retrieval:
     def export_netcdf(self):
         # Creating output image
         # Create a new netCDF file
-        nc_file = nc.Dataset(self.output_file, 'w', format='NETCDF4')
+        nc_file = nc.Dataset(self.output_file, "w", format="NETCDF4")
 
         # Set global attributes
-        nc_file.title = 'CHIME-E2E Level-2B product data'
-        nc_file.institution = 'University of Valencia (UVEG)'
-        nc_file.source = 'L2GPP'
-        nc_file.history = 'File generated by L2B Module'
-        nc_file.references = 'L2B.MO.01'
-        nc_file.comment = 'n/a'
+        nc_file.title = "CHIME-E2E Level-2B product data"
+        nc_file.institution = "University of Valencia (UVEG)"
+        nc_file.source = "L2GPP"
+        nc_file.history = "File generated by L2B Module"
+        nc_file.references = "L2B.MO.01"
+        nc_file.comment = "n/a"
 
         # Create groups
         for i in range(self.number_of_models):
             group = nc_file.createGroup(self.bio_models[i].veg_index)
-            if self.bio_models[i].veg_index == 'LCC':
-                group.long_name = 'Leaf Chlorophyll Content (LCC)'
-            elif self.bio_models[i].veg_index == 'LWC':
-                group.long_name = 'Leaf Water Content (LWC)'
-            elif self.bio_models[i].veg_index == 'LNC':
-                group.long_name = 'Leaf Nitrogen Content (LNC)'
-            elif self.bio_models[i].veg_index == 'LMA':
-                group.long_name = 'Leaf Mass Area (LMA)'
-            elif self.bio_models[i].veg_index == 'LAI':
-                group.long_name = 'Leaf Area Index (LAI)'
-            elif self.bio_models[i].veg_index == 'CCC':
-                group.long_name = 'Canopy Chlorophyll Content (CCC)'
-            elif self.bio_models[i].veg_index == 'CWC':
-                group.long_name = 'Canopy Water Content (CWC)'
-            elif self.bio_models[i].veg_index == 'CDMC':
-                group.long_name = 'Canopy Dry Matter Content (CDMC)'
-            elif self.bio_models[i].veg_index == 'CNC':
-                group.long_name = 'Canopy Nitrogen Content (CNC)'
-            elif self.bio_models[i].veg_index == 'FVC':
-                group.long_name = 'Fractional Vegetation Cover (FVC)'
-            elif self.bio_models[i].veg_index == 'FAPAR':
-                group.long_name = 'Fraction of Absorbed Photosynthetically Active Radiation (FAPAR)'
+            if self.bio_models[i].veg_index == "LCC":
+                group.long_name = "Leaf Chlorophyll Content (LCC)"
+            elif self.bio_models[i].veg_index == "LWC":
+                group.long_name = "Leaf Water Content (LWC)"
+            elif self.bio_models[i].veg_index == "LNC":
+                group.long_name = "Leaf Nitrogen Content (LNC)"
+            elif self.bio_models[i].veg_index == "LMA":
+                group.long_name = "Leaf Mass Area (LMA)"
+            elif self.bio_models[i].veg_index == "LAI":
+                group.long_name = "Leaf Area Index (LAI)"
+            elif self.bio_models[i].veg_index == "CCC":
+                group.long_name = "Canopy Chlorophyll Content (CCC)"
+            elif self.bio_models[i].veg_index == "CWC":
+                group.long_name = "Canopy Water Content (CWC)"
+            elif self.bio_models[i].veg_index == "CDMC":
+                group.long_name = "Canopy Dry Matter Content (CDMC)"
+            elif self.bio_models[i].veg_index == "CNC":
+                group.long_name = "Canopy Nitrogen Content (CNC)"
+            elif self.bio_models[i].veg_index == "FVC":
+                group.long_name = "Fractional Vegetation Cover (FVC)"
+            elif self.bio_models[i].veg_index == "FAPAR":
+                group.long_name = "Fraction of Absorbed Photosynthetically Active Radiation (FAPAR)"
 
             # Create dimensions for group
-            nl_dim = group.createDimension('Nl', self.rows)
-            nc_dim = group.createDimension('Nc', self.cols)
+            nl_dim = group.createDimension("Nl", self.rows)
+            nc_dim = group.createDimension("Nc", self.cols)
 
             # Create variables for group
-            retrieval_var = group.createVariable('Retrieval', 'f4', dimensions=('Nc', 'Nl'))
-            retrieval_var.units = self.bio_models[i].units  # Adding the 'Units' attribute
-            sd_var = group.createVariable('SD', 'f4', dimensions=('Nc', 'Nl'))
+            retrieval_var = group.createVariable(
+                "Retrieval", "f4", dimensions=("Nc", "Nl")
+            )
+            retrieval_var.units = self.bio_models[
+                i
+            ].units  # Adding the 'Units' attribute
+            sd_var = group.createVariable("SD", "f4", dimensions=("Nc", "Nl"))
             sd_var.units = self.bio_models[i].units
-            cv_var = group.createVariable('CV', 'f4', dimensions=('Nc', 'Nl'))
-            cv_var.units = '%'
-            qf_var = group.createVariable('QF', 'i1', dimensions=('Nc', 'Nl'))
-            qf_var.units = 'adim'
+            cv_var = group.createVariable("CV", "f4", dimensions=("Nc", "Nl"))
+            cv_var.units = "%"
+            qf_var = group.createVariable("QF", "i1", dimensions=("Nc", "Nl"))
+            qf_var.units = "adim"
 
             # Assign data to the variable
             # Transpose for matlab type output
@@ -287,13 +352,22 @@ class Retrieval:
             sd_var[:] = np.transpose(self.uncertainty_maps[i])
 
         print(f"NetCDF file created successfully at: {self.output_file}")
-        self.show_message(f"NetCDF file created successfully at: {self.output_file}")
-        self.logger.log_message(f"NetCDF file created successfully at: {self.output_file}\n")
+        self.show_message(
+            f"NetCDF file created successfully at: {self.output_file}"
+        )
+        self.logger.log_message(
+            f"NetCDF file created successfully at: {self.output_file}\n"
+        )
 
     def export_envi(self):
         # Open the ENVI file
-        envi_image = envi.open(self.input_file, os.path.join(os.path.dirname(self.input_file),
-                                                             os.path.splitext(os.path.basename(self.input_file))[0]))
+        envi_image = envi.open(
+            self.input_file,
+            os.path.join(
+                os.path.dirname(self.input_file),
+                os.path.splitext(os.path.basename(self.input_file))[0],
+            ),
+        )
         # Storing all the metadata
         info = envi_image.metadata
 
@@ -301,44 +375,57 @@ class Retrieval:
         band_names = []
         for i in range(self.number_of_models):
             band_names.append(self.bio_models[i].veg_index)
-            band_names.append(f'{self.bio_models[i].veg_index}_sd')
+            band_names.append(f"{self.bio_models[i].veg_index}_sd")
 
         # Define metadata ENVI Standard
         metadata = {
-            'description': 'Exported from Python',
-            'samples': info['samples'],
-            'lines': info['lines'],
-            'bands': 2,
-            'header offset': 0,
-            'file type': info['file type'],
-            'data type': 5,  # Float32 data type
-            'interleave': info['interleave'],
-            'sensor type': 'unknown',
-            'byte order': info['byte order'],
-            'map info': info['map info'],
-            'coordinate system string': info['coordinate system string'],
-            'band names': band_names
+            "description": "Exported from Python",
+            "samples": info["samples"],
+            "lines": info["lines"],
+            "bands": 2,
+            "header offset": 0,
+            "file type": info["file type"],
+            "data type": 5,  # Float32 data type
+            "interleave": info["interleave"],
+            "sensor type": "unknown",
+            "byte order": info["byte order"],
+            "map info": info["map info"],
+            "coordinate system string": info["coordinate system string"],
+            "band names": band_names,
         }
 
         # Specify file paths
-        file_path = self.output_file + '.hdr'
+        file_path = self.output_file + ".hdr"
 
         # Check that both lists have the same length
         # Both lists must have the same length
         assert len(self.variable_maps) == len(self.uncertainty_maps)
 
         # Create an interleaved list of matrices
-        interleaved_matrices = [matrix for pair in zip(self.variable_maps, self.uncertainty_maps) for matrix in pair]
+        interleaved_matrices = [
+            matrix
+            for pair in zip(self.variable_maps, self.uncertainty_maps)
+            for matrix in pair
+        ]
 
         # Stack the interleaved matrices along a new axis
         stacked_data = np.stack(interleaved_matrices, axis=-1)
 
         # Save the data to an ENVI file
-        envi.save_image(file_path, stacked_data, interleave=info['interleave'], metadata=metadata)
+        envi.save_image(
+            file_path,
+            stacked_data,
+            interleave=info["interleave"],
+            metadata=metadata,
+        )
 
         print(f"ENVI file created successfully at: {self.output_file}")
-        self.show_message(f"ENVI file created successfully at: {self.output_file}")
-        self.logger.log_message(f"ENVI file created successfully at: {self.output_file}\n")
+        self.show_message(
+            f"ENVI file created successfully at: {self.output_file}"
+        )
+        self.logger.log_message(
+            f"ENVI file created successfully at: {self.output_file}\n"
+        )
 
     # TODO: maybe in a new GUI window?
     def show_results(self):
@@ -348,56 +435,80 @@ class Retrieval:
         !! Only for CCC,CWC, LAI for now !!
         """
         # Create directories for images
-        img_dir = os.path.join(os.path.dirname(self.output_file), 'images')
+        img_dir = os.path.join(os.path.dirname(self.output_file), "images")
         # Check if the directory exists, and create it if it does not
         if not os.path.exists(img_dir):
             os.makedirs(img_dir)
 
-        vec_dir = os.path.join(os.path.dirname(self.output_file), 'vectors')
+        vec_dir = os.path.join(os.path.dirname(self.output_file), "vectors")
         # Check if the directory exists, and create it if it does not
         if not os.path.exists(vec_dir):
             os.makedirs(vec_dir)
 
         for i in range(self.number_of_models):
-            if self.bio_models[i].veg_index == 'CCC':
-                colormap = 'Greens'
-            elif self.bio_models[i].veg_index == 'CWC':
-                colormap = 'Blues'
-            elif self.bio_models[i].veg_index == 'LAI':
-                colormap = 'YlGn'
+            if self.bio_models[i].veg_index == "CCC":
+                colormap = "Greens"
+            elif self.bio_models[i].veg_index == "CWC":
+                colormap = "Blues"
+            elif self.bio_models[i].veg_index == "LAI":
+                colormap = "YlGn"
             else:
-                colormap = 'viridis'
+                colormap = "viridis"
 
             # Showing the result image
             plt.imshow(self.variable_maps[i], cmap=colormap)
-            if self.bio_models[i].veg_index == 'LAI':
-                plt.title(f"Estimated {self.bio_models[i].veg_index} map (m$^2$/m$^2$)")
+            if self.bio_models[i].veg_index == "LAI":
+                plt.title(
+                    f"Estimated {self.bio_models[i].veg_index} map (m$^2$/m$^2$)"
+                )
             else:
-                plt.title(f"Estimated {self.bio_models[i].veg_index} map (g/m$^2$)")
+                plt.title(
+                    f"Estimated {self.bio_models[i].veg_index} map (g/m$^2$)"
+                )
             plt.colorbar()
             plt.tight_layout()
             plt.savefig(
-                os.path.join(img_dir, f'{os.path.basename(self.output_file)}{self.bio_models[i].veg_index}.png'),
-                bbox_inches='tight')
+                os.path.join(
+                    img_dir,
+                    f"{os.path.basename(self.output_file)}{self.bio_models[i].veg_index}.png",
+                ),
+                bbox_inches="tight",
+            )
             plt.savefig(
-                os.path.join(vec_dir, f'{os.path.basename(self.output_file)}{self.bio_models[i].veg_index}.pdf'),
-                bbox_inches='tight')
+                os.path.join(
+                    vec_dir,
+                    f"{os.path.basename(self.output_file)}{self.bio_models[i].veg_index}.pdf",
+                ),
+                bbox_inches="tight",
+            )
             plt.show()
 
             # Showing the uncertainty image
-            plt.imshow(self.uncertainty_maps[i], cmap='jet')
-            if self.bio_models[i].veg_index == 'LAI':
-                plt.title(f"Uncertainty of {self.bio_models[i].veg_index} map (m$^2$/m$^2$)")
+            plt.imshow(self.uncertainty_maps[i], cmap="jet")
+            if self.bio_models[i].veg_index == "LAI":
+                plt.title(
+                    f"Uncertainty of {self.bio_models[i].veg_index} map (m$^2$/m$^2$)"
+                )
             else:
-                plt.title(f"Uncertainty of {self.bio_models[i].veg_index} map (g/m$^2$)")
+                plt.title(
+                    f"Uncertainty of {self.bio_models[i].veg_index} map (g/m$^2$)"
+                )
             plt.colorbar()
             plt.tight_layout()
-            plt.savefig(os.path.join(img_dir,
-                                     f'{os.path.basename(self.output_file)}{self.bio_models[i].veg_index}_uncertainty.png'),
-                        bbox_inches='tight')
-            plt.savefig(os.path.join(vec_dir,
-                                     f'{os.path.basename(self.output_file)}{self.bio_models[i].veg_index}_uncertainty.pdf'),
-                        bbox_inches='tight')
+            plt.savefig(
+                os.path.join(
+                    img_dir,
+                    f"{os.path.basename(self.output_file)}{self.bio_models[i].veg_index}_uncertainty.png",
+                ),
+                bbox_inches="tight",
+            )
+            plt.savefig(
+                os.path.join(
+                    vec_dir,
+                    f"{os.path.basename(self.output_file)}{self.bio_models[i].veg_index}_uncertainty.pdf",
+                ),
+                bbox_inches="tight",
+            )
             plt.show()
 
 
@@ -414,8 +525,13 @@ def module_to_dict(bio_model) -> dict:
     :param bio_model: The module or object containing hyperparameters
     :return: Dictionary with the module's attributes
     """
-    # Convert the module's attributes to a dictionary, excluding special methods/attributes
-    module_dict = {key: value for key, value in vars(bio_model).items() if not key.startswith("__")}
+    # Convert the module's attributes to a dictionary, excluding special
+    # methods/attributes
+    module_dict = {
+        key: value
+        for key, value in vars(bio_model).items()
+        if not key.startswith("__")
+    }
 
     module_dict = {k: v for k, v in module_dict.items() if is_picklable(v)}
 

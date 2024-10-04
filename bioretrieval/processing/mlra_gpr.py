@@ -1,13 +1,11 @@
 # GPR class
 
-import numpy as np
 import math
-import copy
 from multiprocessing import Pool, cpu_count
 
-from bioretrieval.processing.mlra import MLRA_Methods
+import numpy as np
 
-from numba import jit
+from bioretrieval.processing.mlra import MLRA_Methods
 
 
 # GPRMapping inherits from MLRA_Methods
@@ -18,17 +16,28 @@ class MLRA_GPR(MLRA_Methods):
         :param image: The image (3D cube) from MLRA_Methods.
         :param bio_model: The single biological model or hyperparameters from MLRA_Methods.
         """
-        super().__init__(image, bio_model)  # Initialize the parent class (MLRA_Methods)
+        super().__init__(
+            image, bio_model
+        )  # Initialize the parent class (MLRA_Methods)
 
-    #@jit(nopython=True)
+    # @jit(nopython=True)
     def GPR_mapping_pixel(self, args) -> tuple:
         """
         GPR retrieval function for one pixel:
         outputs the mean and variance value calculated
         """
         # Access args
-        pixel_spectra, hyp_ell_GREEN, X_train_GREEN, mean_model_GREEN, hyp_sig_GREEN, \
-            XDX_pre_calc_GREEN, alpha_coefficients_GREEN, Linv_pre_calc_GREEN, hyp_sig_unc_GREEN = args
+        (
+            pixel_spectra,
+            hyp_ell_GREEN,
+            X_train_GREEN,
+            mean_model_GREEN,
+            hyp_sig_GREEN,
+            XDX_pre_calc_GREEN,
+            alpha_coefficients_GREEN,
+            Linv_pre_calc_GREEN,
+            hyp_sig_unc_GREEN,
+        ) = args
 
         # Use the bio_model attributes
         im_norm_ell2D = pixel_spectra
@@ -38,18 +47,28 @@ class MLRA_GPR(MLRA_Methods):
         im_norm_ell2D = im_norm_ell2D.reshape(-1, 1)
         im_norm_ell2D_hypell = im_norm_ell2D_hypell.reshape(-1, 1)
 
-        PtTPt = np.matmul(np.transpose(im_norm_ell2D_hypell), im_norm_ell2D).ravel() * (-0.5)
-        PtTDX = np.matmul(X_train_GREEN, im_norm_ell2D_hypell).ravel().flatten()
+        PtTPt = np.matmul(
+            np.transpose(im_norm_ell2D_hypell), im_norm_ell2D
+        ).ravel() * (-0.5)
+        PtTDX = (
+            np.matmul(X_train_GREEN, im_norm_ell2D_hypell).ravel().flatten()
+        )
 
         arg1 = np.exp(PtTPt) * hyp_sig_GREEN
         k_star = np.exp(PtTDX - (XDX_pre_calc_GREEN.ravel() * 0.5))
 
-        mean_pred = (np.dot(k_star.ravel(), alpha_coefficients_GREEN.ravel()) * arg1) + mean_model_GREEN
+        mean_pred = (
+            np.dot(k_star.ravel(), alpha_coefficients_GREEN.ravel()) * arg1
+        ) + mean_model_GREEN
         filterDown = np.greater(mean_pred, 0).astype(int)
         mean_pred = mean_pred * filterDown
 
-        k_star_uncert = np.exp(PtTDX - (XDX_pre_calc_GREEN.ravel() * 0.5)) * arg1
-        Vvector = np.matmul(Linv_pre_calc_GREEN, k_star_uncert.reshape(-1, 1)).ravel()
+        k_star_uncert = (
+            np.exp(PtTDX - (XDX_pre_calc_GREEN.ravel() * 0.5)) * arg1
+        )
+        Vvector = np.matmul(
+            Linv_pre_calc_GREEN, k_star_uncert.reshape(-1, 1)
+        ).ravel()
 
         Variance = math.sqrt(abs(hyp_sig_unc_GREEN - np.dot(Vvector, Vvector)))
 
@@ -69,16 +88,16 @@ class MLRA_GPR(MLRA_Methods):
 
         # TODO here
 
-        hyp_ell_GREEN = self.bio_model['hyp_ell_GREEN']
-        X_train_GREEN = self.bio_model['X_train_GREEN']
-        mean_model_GREEN = self.bio_model['mean_model_GREEN']
-        hyp_sig_GREEN = self.bio_model['hyp_sig_GREEN']
-        XDX_pre_calc_GREEN = self.bio_model['XDX_pre_calc_GREEN']
-        alpha_coefficients_GREEN = self.bio_model['alpha_coefficients_GREEN']
-        Linv_pre_calc_GREEN = self.bio_model['Linv_pre_calc_GREEN']
-        hyp_sig_unc_GREEN = self.bio_model['hyp_sig_unc_GREEN']
+        hyp_ell_GREEN = self.bio_model["hyp_ell_GREEN"]
+        X_train_GREEN = self.bio_model["X_train_GREEN"]
+        mean_model_GREEN = self.bio_model["mean_model_GREEN"]
+        hyp_sig_GREEN = self.bio_model["hyp_sig_GREEN"]
+        XDX_pre_calc_GREEN = self.bio_model["XDX_pre_calc_GREEN"]
+        alpha_coefficients_GREEN = self.bio_model["alpha_coefficients_GREEN"]
+        Linv_pre_calc_GREEN = self.bio_model["Linv_pre_calc_GREEN"]
+        hyp_sig_unc_GREEN = self.bio_model["hyp_sig_unc_GREEN"]
 
-        '''
+        """
 
         hyp_ell_GREEN = copy.deepcopy(self.bio_model.hyp_ell_GREEN)
         X_train_GREEN = copy.deepcopy(self.bio_model.X_train_GREEN)
@@ -88,12 +107,25 @@ class MLRA_GPR(MLRA_Methods):
         alpha_coefficients_GREEN = copy.deepcopy(self.bio_model.alpha_coefficients_GREEN)
         Linv_pre_calc_GREEN = copy.deepcopy(self.bio_model.Linv_pre_calc_GREEN)
         hyp_sig_unc_GREEN = copy.deepcopy(self.bio_model.hyp_sig_unc_GREEN)
-        '''
+        """
 
-        # Create a list of arguments (only the pixel spectra) for each pixel in the image
-        args_list = [(self.image[:, f, v], hyp_ell_GREEN, X_train_GREEN, mean_model_GREEN, hyp_sig_GREEN,
-                      XDX_pre_calc_GREEN, alpha_coefficients_GREEN, Linv_pre_calc_GREEN, hyp_sig_unc_GREEN) for f in
-                     range(ydim) for v in range(xdim)]
+        # Create a list of arguments (only the pixel spectra) for each pixel in
+        # the image
+        args_list = [
+            (
+                self.image[:, f, v],
+                hyp_ell_GREEN,
+                X_train_GREEN,
+                mean_model_GREEN,
+                hyp_sig_GREEN,
+                XDX_pre_calc_GREEN,
+                alpha_coefficients_GREEN,
+                Linv_pre_calc_GREEN,
+                hyp_sig_unc_GREEN,
+            )
+            for f in range(ydim)
+            for v in range(xdim)
+        ]
 
         # Use multiprocessing to process the pixels in parallel
         with Pool(processes=cpu_count()) as pool:
