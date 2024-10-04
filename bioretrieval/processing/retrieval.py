@@ -2,7 +2,9 @@
     Contains the retrieval class which performs the retrieval
     from reading the image to writing the retrieved result
 """
+
 import importlib
+import logging
 import os
 import pickle
 import sys
@@ -13,16 +15,16 @@ import numpy as np
 from matplotlib import pyplot as plt
 from spectral.io import envi
 
-from bioretrieval.auxiliar.image_read import (
-    read_envi,
-    read_netcdf,
-    show_reflectance_img,
-)
+from bioretrieval.auxiliar.image_read import (read_envi, read_netcdf,
+                                              show_reflectance_img)
 from bioretrieval.auxiliar.logger_class import Logger
 from bioretrieval.auxiliar.spectra_interpolation import spline_interpolation
 from bioretrieval.processing.mlra_gpr import MLRA_GPR
 
-# from bioretrieval.processing.mlra_gpr import GPR_mapping_parallel
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 
 class Retrieval:
@@ -71,7 +73,7 @@ class Retrieval:
     @property
     def bio_retrieval(self) -> bool:
         self.logger.open()
-        print("Reading image...")
+        logging.info("Reading image...")
         self.show_message("Reading image...")
         self.start = time.time()
         # __________________________Split image read by file type______________
@@ -97,10 +99,10 @@ class Retrieval:
         self.process_time = self.end - self.start
         self.rows, self.cols, self.dims = self.img_reflectance.shape
 
-        print(f"Image read. Elapsed time:{self.process_time}")
-        self.show_message(f"Image read. Elapsed time:{self.process_time}")
+        logging.info(f"Image read. Elapsed time: {self.process_time}")
+        self.show_message(f"Image read. Elapsed time: {self.process_time}")
         self.logger.log_message(
-            f"Image read. Elapsed time:{self.process_time}\n"
+            f"Image read. Elapsed time: {self.process_time}\n"
         )
 
         # Showing image
@@ -116,7 +118,7 @@ class Retrieval:
                     f"No models found in path: {self.model_path}"
                 )
         except Exception as e:
-            print(e)
+            logging.error(e)
             self.show_message(str(e))
             self.logger.log_message(f"{e}\n")
             return True
@@ -124,7 +126,9 @@ class Retrieval:
             file for file in list_of_files if file.endswith(".py")
         ]
         self.number_of_models = len(list_of_models)
-        print(f"Getting model {self.number_of_models} names was successful.")
+        logging.info(
+            f"Getting model {self.number_of_models} names was successful."
+        )
         self.show_message(
             f"Getting model {self.number_of_models} names was successful."
         )
@@ -142,7 +146,7 @@ class Retrieval:
                     os.path.splitext(list_of_models[i])[0], package=None
                 )
             )
-            print(f"{self.bio_models[i].model} imported")
+            logging.info(f"{self.bio_models[i].model} imported")
             self.show_message(f"{self.bio_models[i].model} imported")
             self.logger.log_message(f"{self.bio_models[i].model} imported\n")
 
@@ -150,13 +154,13 @@ class Retrieval:
 
         for i in range(self.number_of_models):
             # Running each model on the image
-            print(f"Running {self.bio_models[i].model} model")
+            logging.info(f"Running {self.bio_models[i].model} model")
             self.show_message(f"Running {self.bio_models[i].model} model")
             self.logger.log_message(
                 f"Running {self.bio_models[i].model} model\n"
             )
 
-            print("Band selection...")
+            logging.info("Band selection...")
             self.show_message("Band selection...")
 
             # Band selection of the image
@@ -165,7 +169,7 @@ class Retrieval:
             self.end = time.time()
             self.process_time = self.end - self.start
 
-            print(
+            logging.info(
                 f"Bands selected. Shape: {data_refl_new.shape} \nElapsed time: {self.process_time}"
             )
             self.show_message(
@@ -202,7 +206,7 @@ class Retrieval:
                     self.bio_models[i]
                 )  # we dont use it now
 
-                print("Running GPR...")
+                logging.info("Running GPR...")
                 self.show_message("Running GPR...")
 
                 gpr_object = MLRA_GPR(self.img_array, model_dict)
@@ -214,7 +218,7 @@ class Retrieval:
 
                 # Logging
                 self.process_time = self.end - self.start
-                print(f"Elapsed time of GPR: {self.process_time}")
+                logging.info(f"Elapsed time of GPR: {self.process_time}")
                 self.show_message(f"Elapsed time of GPR: {self.process_time}")
                 self.logger.log_message(
                     f"Elapsed time of GPR: {self.process_time}\n"
@@ -222,7 +226,7 @@ class Retrieval:
                 self.variable_maps.append(variable_map)
                 self.uncertainty_maps.append(uncertainty_map)
 
-                print(
+                logging.info(
                     f"Retrieval of {self.bio_models[i].veg_index} was successful."
                 )
                 self.show_message(
@@ -244,11 +248,13 @@ class Retrieval:
             reflectances_new = self.img_reflectance[
                 :, :, np.where(np.in1d(current_wl, expected_wl))[0]
             ]
-            print("Matching bands found.")
+            logging.info("Matching bands found.")
             self.show_message("Matching bands found.")
             self.logger.log_message("Matching bands found.\n")
         else:
-            print("No matching bands found, spline interpolation is applied.")
+            logging.info(
+                "No matching bands found, spline interpolation is applied."
+            )
             self.show_message(
                 "No matching bands found, spline interpolation is applied."
             )
@@ -263,7 +269,7 @@ class Retrieval:
 
     def export_retrieval(self) -> bool:
         self.logger.open()
-        print("Exporting image...")
+        logging.info("Exporting image...")
         self.show_message("Exporting image...")
         self.start = time.time()
         # __________________________Split image read by file type______________
@@ -275,13 +281,13 @@ class Retrieval:
         self.end = time.time()
         self.process_time = self.end - self.start
 
-        print(f"Image exported. Elapsed time:{self.process_time}")
+        logging.info(f"Image exported. Elapsed time:{self.process_time}")
         self.show_message(f"Image exported. Elapsed time:{self.process_time}")
         self.logger.log_message(
             f"Image exported. Elapsed time:{self.process_time}\n"
         )
 
-        print(f"Show images")
+        logging.info(f"Show images")
         self.show_message(f"Show images")
         self.logger.log_message(f"Show images")
         self.show_results()
@@ -351,7 +357,9 @@ class Retrieval:
             retrieval_var[:] = np.transpose(self.variable_maps[i])
             sd_var[:] = np.transpose(self.uncertainty_maps[i])
 
-        print(f"NetCDF file created successfully at: {self.output_file}")
+        logging.info(
+            f"NetCDF file created successfully at: {self.output_file}"
+        )
         self.show_message(
             f"NetCDF file created successfully at: {self.output_file}"
         )
@@ -419,7 +427,7 @@ class Retrieval:
             metadata=metadata,
         )
 
-        print(f"ENVI file created successfully at: {self.output_file}")
+        logging.info(f"ENVI file created successfully at: {self.output_file}")
         self.show_message(
             f"ENVI file created successfully at: {self.output_file}"
         )

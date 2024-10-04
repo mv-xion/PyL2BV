@@ -2,15 +2,21 @@
     This file is handling the functions for the
     reflectance image. For CHIME and ENVI formats
 """
+
+import logging
 import os
 
 import matplotlib.pyplot as plt
-
 # Importing packages
 import netCDF4 as nc
 import numpy as np
 import spectral.io.envi as envi
 from pyproj import Proj
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 
 # __________________________netCDF handle____________________________
@@ -21,20 +27,24 @@ def read_netcdf(path, conversion_factor):
     :param conversion_factor: image conversion factor
     :return: data cube of reflectance image, wavelength list
     """
-    # Read netCDF image ! Cannot be accent in the path!
-    ds_im = nc.Dataset(path)
-    # Converting reflectance data into numpy array, scaling 1/10000
-    # Scale is calculated from: image scale 1/100, difference between image
-    # values and GPR RTM reflectance values
-    np_refl = ds_im["l2a_BOA_rfl"][:]
-    np_refl = np_refl.data
-    data_refl = np_refl * conversion_factor
+    try:
+        # Read netCDF image ! Cannot be accent in the path!
+        ds_im = nc.Dataset(path)
+        # Converting reflectance data into numpy array, scaling 1/10000
+        # Scale is calculated from: image scale 1/100, difference between image
+        # values and GPR RTM reflectance values
+        np_refl = ds_im["l2a_BOA_rfl"][:]
+        np_refl = np_refl.data
+        data_refl = np_refl * conversion_factor
 
-    # Saving image wavelengths
-    data_wavelength = ds_im["central_wavelength"][:]
-    data_wavelength = data_wavelength.data
+        # Saving image wavelengths
+        data_wavelength = ds_im["central_wavelength"][:]
+        data_wavelength = data_wavelength.data
 
-    return data_refl, data_wavelength
+        return data_refl, data_wavelength
+    except Exception as e:
+        logging.error(f"Error reading netCDF file: {e}")
+        raise
 
 
 # __________________________________ENVI handle______________________________
@@ -48,37 +58,42 @@ def read_envi(path: str, conversion_factor: float) -> tuple:
     :return: data cube of reflectance image, wavelength list
     optional: returns latitude & longitude list if map information is available
     """
-    # Open the ENVI file
-    envi_image = envi.open(
-        path,
-        os.path.join(
-            os.path.dirname(path), os.path.splitext(os.path.basename(path))[0]
-        ),
-    )
+    try:
+        # Open the ENVI file
+        envi_image = envi.open(
+            path,
+            os.path.join(
+                os.path.dirname(path),
+                os.path.splitext(os.path.basename(path))[0],
+            ),
+        )
 
-    # Load the data into a NumPy array
-    data = envi_image.asarray()
-    data = data * conversion_factor
+        # Load the data into a NumPy array
+        data = envi_image.asarray()
+        data = data * conversion_factor
 
-    # Storing all the metadata
-    info = envi_image.metadata
+        # Storing all the metadata
+        info = envi_image.metadata
 
-    # Storing wavelengths
-    data_wavelength = [
-        int(float(wavelength))
-        for wavelength in envi_image.metadata["wavelength"]
-    ]
-    data_wavelength = np.array(data_wavelength)
+        # Storing wavelengths
+        data_wavelength = [
+            int(float(wavelength))
+            for wavelength in envi_image.metadata["wavelength"]
+        ]
+        data_wavelength = np.array(data_wavelength)
 
-    # Obtain lat,lon (transform UTM coordinates)
-    if "map info" in info:
-        map_info = info["map info"]
-        lon = int(info["samples"])
-        lat = int(info["lines"])
-        longitude, latitude = get_lat_lon_envi(map_info, lon, lat)  # x,y
-        return data, data_wavelength, longitude, latitude
-    else:
-        return data, data_wavelength
+        # Obtain lat,lon (transform UTM coordinates)
+        if "map info" in info:
+            map_info = info["map info"]
+            lon = int(info["samples"])
+            lat = int(info["lines"])
+            longitude, latitude = get_lat_lon_envi(map_info, lon, lat)  # x,y
+            return data, data_wavelength, longitude, latitude
+        else:
+            return data, data_wavelength
+    except Exception as e:
+        logging.error(f"Error reading ENVI file: {e}")
+        raise
 
 
 def get_lat_lon_envi(map_info: dict, lon: list, lat: list) -> tuple:
@@ -90,47 +105,51 @@ def get_lat_lon_envi(map_info: dict, lon: list, lat: list) -> tuple:
     :return: lists of latitude and longitude
     in degree coordinates
     """
-    # Coordinates of the upper left corner
-    xi = float(map_info[1])
-    yi = float(map_info[2])
-    xm = float(map_info[3])  # latitude
-    ym = float(map_info[4])  # longitude
-    dx = int(float(map_info[5]))
-    dy = int(float(map_info[6]))
-    # Adjust points to corner (1.5,1.5)
-    if yi > 1.5:
-        ym += (yi * dy) - dy
-    if xi > 1.5:
-        xm -= (xi * dy) - dx
-    max_latlon = max(lat, lon)
-    x_vector = xm + np.arange(max_latlon) * dx
-    y_vector = np.flip(ym - np.arange(max_latlon) * dy)
+    try:
+        # Coordinates of the upper left corner
+        xi = float(map_info[1])
+        yi = float(map_info[2])
+        xm = float(map_info[3])  # latitude
+        ym = float(map_info[4])  # longitude
+        dx = int(float(map_info[5]))
+        dy = int(float(map_info[6]))
+        # Adjust points to corner (1.5,1.5)
+        if yi > 1.5:
+            ym += (yi * dy) - dy
+        if xi > 1.5:
+            xm -= (xi * dy) - dx
+        max_latlon = max(lat, lon)
+        x_vector = xm + np.arange(max_latlon) * dx
+        y_vector = np.flip(ym - np.arange(max_latlon) * dy)
 
-    # Define the projection parameters
-    utm_zone = int(map_info[7])
-    utm_hemisphere = map_info[8]  # Assuming the hemisphere is North
-    datum = map_info[9].replace("-", "")
-    utm_proj_string = (
-        f"+proj=utm +zone={utm_zone} +{utm_hemisphere} +datum={datum}"
-    )
+        # Define the projection parameters
+        utm_zone = int(map_info[7])
+        utm_hemisphere = map_info[8]  # Assuming the hemisphere is North
+        datum = map_info[9].replace("-", "")
+        utm_proj_string = (
+            f"+proj=utm +zone={utm_zone} +{utm_hemisphere} +datum={datum}"
+        )
 
-    # Create a pyproj projection object
-    utm_proj = Proj(utm_proj_string)
+        # Create a pyproj projection object
+        utm_proj = Proj(utm_proj_string)
 
-    # Convert the UTM coordinates to latitude and longitude
-    longitude, latitude = utm_proj(x_vector, y_vector, inverse=True)
+        # Convert the UTM coordinates to latitude and longitude
+        longitude, latitude = utm_proj(x_vector, y_vector, inverse=True)
 
-    # Cut values if needed
-    if lat < lon:
-        latitude = latitude[:lat]
-    elif lon < lat:
-        longitude = longitude[:lon]
+        # Cut values if needed
+        if lat < lon:
+            latitude = latitude[:lat]
+        elif lon < lat:
+            longitude = longitude[:lon]
 
-    # TODO: for testing
-    # print("Latitude:", latitude, len(latitude))
-    # print("Longitude:", longitude, len(longitude))
+        # TODO: for testing
+        # logging.info(f"Latitude: {latitude}, Length: {len(latitude)}")
+        # logging.info(f"Longitude: {longitude}, Length: {len(longitude)}")
 
-    return longitude, latitude  # x,y
+        return longitude, latitude  # x,y
+    except Exception as e:
+        logging.error(f"Error getting latitude and longitude: {e}")
+        raise
 
 
 # ________________________ Plotting images ________________________
@@ -143,21 +162,25 @@ def show_reflectance_img(data_refl: np.ndarray, data_wavelength: np.ndarray):
     :param data_wavelength: list of wavelengths
     :return: no return value just plotting the image
     """
-    # Defining wavelength RGB
-    indexes = np.zeros(3)
-    values_to_find = [639, 547, 463]
-    # Find the index closest to each value
-    for i, value in enumerate(values_to_find):
-        closest_index = np.abs(data_wavelength - value).argmin()
-        indexes[i] = closest_index
-    idx_int = indexes.astype(np.uint8)
-    data_r_for_show = data_refl[:, :, idx_int]
-    # Normalise image
-    data_r_for_show_norm = (data_r_for_show - np.min(data_r_for_show)) / (
-        np.max(data_r_for_show) - np.min(data_r_for_show)
-    )
-    # Showing the image
-    plt.imshow(data_r_for_show_norm, interpolation="nearest")
-    plt.title("Reflectance image (RGB)")
-    plt.colorbar()
-    plt.show()
+    try:
+        # Defining wavelength RGB
+        indexes = np.zeros(3)
+        values_to_find = [639, 547, 463]
+        # Find the index closest to each value
+        for i, value in enumerate(values_to_find):
+            closest_index = np.abs(data_wavelength - value).argmin()
+            indexes[i] = closest_index
+        idx_int = indexes.astype(np.uint8)
+        data_r_for_show = data_refl[:, :, idx_int]
+        # Normalise image
+        data_r_for_show_norm = (data_r_for_show - np.min(data_r_for_show)) / (
+            np.max(data_r_for_show) - np.min(data_r_for_show)
+        )
+        # Showing the image
+        plt.imshow(data_r_for_show_norm, interpolation="nearest")
+        plt.title("Reflectance image (RGB)")
+        plt.colorbar()
+        plt.show()
+    except Exception as e:
+        logging.error(f"Error showing reflectance image: {e}")
+        raise

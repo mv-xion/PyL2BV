@@ -1,6 +1,8 @@
 """
     GUI for BioRetrieval programme using the tkinter library
 """
+
+import logging
 import os
 import threading
 import tkinter as tk
@@ -8,12 +10,18 @@ from tkinter import filedialog, ttk
 
 from bioretrieval.processing.processing_module import bio_retrieval_module
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
 
 class SimpleGUI(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Retrieval of biophysical variables")
         self.create_widgets()
+        logging.info("Initialized SimpleGUI.")
 
     def create_widgets(self):
         default_folder = os.getcwd()
@@ -77,6 +85,8 @@ class SimpleGUI(tk.Tk):
         )
         self.button_run.grid(row=2, column=1, padx=5, pady=5)
 
+        logging.info("Created GUI widgets.")
+
     def browse_input_folder(self):
         input_folder = filedialog.askdirectory(
             initialdir=os.getcwd(), title="Select Input Folder"
@@ -84,6 +94,7 @@ class SimpleGUI(tk.Tk):
         if input_folder:
             self.entry_input_folder.delete(0, tk.END)
             self.entry_input_folder.insert(0, input_folder)
+            logging.info(f"Selected input folder: {input_folder}")
 
     def browse_model_folder(self):
         model_folder = filedialog.askdirectory(
@@ -92,6 +103,7 @@ class SimpleGUI(tk.Tk):
         if model_folder:
             self.entry_model_folder.delete(0, tk.END)
             self.entry_model_folder.insert(0, model_folder)
+            logging.info(f"Selected model folder: {model_folder}")
 
     def start_model_thread(self):
         """
@@ -107,6 +119,12 @@ class SimpleGUI(tk.Tk):
             if os.path.isdir(input_folder_path) and os.path.isdir(
                 model_folder_path
             ):
+                logging.info("Starting model thread.")
+                logging.info(f"Input folder: {input_folder_path}")
+                logging.info(f"Model folder: {model_folder_path}")
+                logging.info(f"Input type: {input_type}")
+                logging.info(f"Conversion factor: {conversion_factor}")
+
                 # Disable the Run button
                 self.button_run.config(state=tk.DISABLED)
 
@@ -147,7 +165,8 @@ class SimpleGUI(tk.Tk):
                     "Invalid or no input or model folder selected"
                 )
         except Exception as e:
-            print("Error", e)
+            logging.error("Error occurred while starting model thread", exc_info=True)
+            self.show_message("Error occurred while starting model thread")
 
     def run_model(
         self,
@@ -164,7 +183,7 @@ class SimpleGUI(tk.Tk):
         :param model_folder_path: path to the model folder
         :return: Shows completion message and is able to run again
         """
-        # Call the module function that can send messages to the text widget
+        logging.info("Running model.")
         message = bio_retrieval_module(
             input_folder_path,
             input_type,
@@ -178,10 +197,14 @@ class SimpleGUI(tk.Tk):
 
         if message == 1:
             completion_message = "Something went wrong"
+            logging.error(completion_message)
         elif message == 0:
             completion_message = "Model ran successfully"
+            logging.info(completion_message)
         else:
             completion_message = "Unknown Error"
+            logging.warning(completion_message)
+
         # Display completion message
         self.progress_label.config(text=completion_message)
 
@@ -196,6 +219,7 @@ class SimpleGUI(tk.Tk):
         """
         self.text_widget.insert(tk.END, message + "\n")
         self.text_widget.see(tk.END)  # Scroll to the end of the text widget
+        logging.info(f"Message displayed: {message}")
 
 
 class NonNegativeNumberEntry(tk.Entry):
@@ -225,5 +249,11 @@ def main():
     Main starts the programme with the GUI
     :return:
     """
+    logging.info("Starting the BioRetrieval GUI application.")
     gui = SimpleGUI()
     gui.mainloop()
+    logging.info("BioRetrieval GUI application closed.")
+
+
+if __name__ == "__main__":
+    main()

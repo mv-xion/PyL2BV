@@ -3,12 +3,18 @@
     This includes making initial tests, creating output folder and running the retrieval function.
 """
 
-import os.path
+import logging
+import os
 import shutil
 from datetime import datetime
 
 from bioretrieval.auxiliar.logger_class import Logger
 from bioretrieval.processing.retrieval import Retrieval
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 
 def bio_retrieval_module(
@@ -53,6 +59,7 @@ def bio_retrieval_module(
 
     if input_type == "CHIME netCDF":
         show_message("Type: " + input_type)
+        logging.info(f"Processing input type: {input_type}")
 
         # Check input files, log if number of files are not correct
         list_of_files = os.listdir(input_path)
@@ -64,7 +71,7 @@ def bio_retrieval_module(
                 make_output_folder(output_path)
                 raise FileNotFoundError("Missing input nc file.")
         except Exception as e:
-            print("Error", e)
+            logging.error(f"Error: {e}")
             show_message("Missing input nc file.")
             with open(logfile_path, "w") as fileID:
                 fileID.write(
@@ -110,7 +117,7 @@ def bio_retrieval_module(
                 l2b_output_file_qua = l2b_output_files[i].replace("IMG", "QUA")
                 shutil.copyfile(input_file_qua, l2b_output_file_qua)
             except FileNotFoundError as e:
-                print("Error:", e)
+                logging.error(f"Error: {e}")
                 show_message("Missing complementary files for CHIME image.")
                 with open(logfile_path, "w") as fileID:
                     fileID.write(
@@ -120,9 +127,9 @@ def bio_retrieval_module(
                     fileID.write(f"Input Path: {input_path} \n")
                 return 1
             except Exception as e:
-                print("Error:", e)
+                logging.error(f"Unexpected error: {e}")
                 show_message(
-                    "An unexpected error occurred. While copying complementary file."
+                    "An unexpected error occurred while copying complementary file."
                 )
                 with open(logfile_path, "w") as fileID:
                     fileID.write(
@@ -133,7 +140,8 @@ def bio_retrieval_module(
                 return 1
 
     elif input_type == "ENVI Standard":
-        show_message("Type:" + input_type)
+        show_message("Type: " + input_type)
+        logging.info(f"Processing input type: {input_type}")
 
         # Check input files, log if number of files are not correct
         list_of_files = os.listdir(input_path)
@@ -149,7 +157,7 @@ def bio_retrieval_module(
                     os.makedirs(output_path)
                 raise FileNotFoundError("Missing input hdr file.")
         except Exception as e:
-            print("Error", e)
+            logging.error(f"Error: {e}")
             show_message("Missing input hdr file.")
             with open(logfile_path, "w") as fileID:
                 fileID.write(
@@ -179,7 +187,7 @@ def bio_retrieval_module(
         # Create output folder
         flag_out = make_output_folder(output_path)
     else:
-        print("Invalid input format")
+        logging.error("Invalid input format")
         return 1
 
     # ____________________________________Retrieval________________________________
@@ -192,16 +200,14 @@ def bio_retrieval_module(
         if i == 0:
             # Log information to logfile
             if flag_out:
-                print("Output folder already exists. Folder was overwritten.")
-                show_message(
+                logging.info(
                     "Output folder already exists. Folder was overwritten."
                 )
                 log_file_id.log_message(
                     "Output folder already exists. Folder was overwritten.\n"
                 )
             else:
-                print("Output folder does not exist. Folder was created.")
-                show_message(
+                logging.info(
                     "Output folder does not exist. Folder was created."
                 )
                 log_file_id.log_message(
@@ -209,11 +215,10 @@ def bio_retrieval_module(
                 )
 
         # Log image information
-        print(f"Tile: {img_name}")
+        logging.info(f"Processing tile: {img_name}")
         show_message(f"Tile: {img_name}")
         log_file_id.log_message(f"Tile: {img_name}\n")
         log_file_id.close()
-        print(f"output: {l2b_output_files[i]}")
 
         # Creating Retrieval object and call function
         retrieval_object = Retrieval(
@@ -228,13 +233,15 @@ def bio_retrieval_module(
 
         return_value = retrieval_object.bio_retrieval
         if return_value == 1:  # There was an error
+            logging.error(f"Error during retrieval of {img_name}")
             return 1
         else:
             export_value = retrieval_object.export_retrieval()
             if export_value == 1:  # There was an error
+                logging.error(f"Error during export of {img_name}")
                 return 1
 
-        print(f"Retrieval of {img_name} successful.")
+        logging.info(f"Retrieval of {img_name} successful.")
         show_message(f"Retrieval of {img_name} successful.")
         with open(f"{log_path}_logfile.log", "a") as log_file_id:
             log_file_id.write(f"Retrieval of {img_name} successful.\n")
@@ -247,12 +254,14 @@ def make_output_folder(output_path: str) -> bool:
     :param output_path: path of output folder
     :return: flag: 1 if overwritten, 0 if not
     """
-    # If output folder exists, delete it and make a new one
     if os.path.exists(output_path):
         shutil.rmtree(output_path)
         os.makedirs(output_path)
-        flag_out = True
+        logging.info(
+            f"Output folder {output_path} already existed and was overwritten."
+        )
+        return True
     else:
         os.makedirs(output_path)
-        flag_out = False
-    return flag_out
+        logging.info(f"Output folder {output_path} was created.")
+        return False
