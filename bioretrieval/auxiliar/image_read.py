@@ -7,7 +7,7 @@ import logging
 import os
 
 import matplotlib.pyplot as plt
-
+import numpy as np
 # Importing packages
 from netCDF4 import Dataset
 from pyproj import Proj
@@ -22,14 +22,15 @@ def read_netcdf(path, conversion_factor):
     :param conversion_factor: image conversion factor
     :return: data cube of reflectance image, wavelength list
     """
-    # Read netCDF image ! Cannot be accent in the path!
-    ds_im = Dataset(path)
-    # Converting reflectance data into numpy array, scaling 1/10000
-    # Scale is calculated from: image scale 1/100, difference between image
-    # values and GPR RTM reflectance values
-    np_refl = ds_im["l2a_BOA_rfl"][:]
-    np_refl = np_refl.data
-    data_refl = np_refl * conversion_factor
+    try:
+        # Read netCDF image ! Cannot be accent in the path!
+        ds_im = Dataset(path)
+        # Converting reflectance data into numpy array, scaling 1/10000
+        # Scale is calculated from: image scale 1/100, difference between image
+        # values and GPR RTM reflectance values
+        np_refl = ds_im["l2a_BOA_rfl"][:]
+        np_refl = np_refl.data
+        data_refl = np_refl * conversion_factor
 
         # Saving image wavelengths
         data_wavelength = ds_im["central_wavelength"][:]
@@ -52,13 +53,13 @@ def read_envi(path: str, conversion_factor: float) -> tuple:
     :return: data cube of reflectance image, wavelength list
     optional: returns latitude & longitude list if map information is available
     """
-    # Open the ENVI file
-    envi_image = open(
-        path,
-        os.path.join(
-            os.path.dirname(path), os.path.splitext(os.path.basename(path))[0]
-        ),
-    )
+    try:
+        # Open the ENVI file
+        envi_image = open_image(
+            os.path.join(
+                os.path.dirname(path), os.path.splitext(os.path.basename(path))[0]
+            )
+        )
 
         # Load the data into a NumPy array
         data = envi_image.asarray()
@@ -67,16 +68,16 @@ def read_envi(path: str, conversion_factor: float) -> tuple:
         # Storing all the metadata
         info = envi_image.metadata
 
-    # Storing wavelengths
-    data_wavelength = list(
-        map(
-            lambda wavelength: int(float(wavelength)),
-            envi_image.metadata["wavelength"],
+        # Storing wavelengths
+        data_wavelength = list(
+            map(
+                lambda wavelength: int(float(wavelength)),
+                envi_image.metadata["wavelength"],
+            )
         )
-    )
-    data_wavelength = np.array(data_wavelength)
+        data_wavelength = np.array(data_wavelength)
 
-        # Obtain lat,lon (transform UTM coordinates)
+        # Obtain lat, lon (transform UTM coordinates)
         if "map info" in info:
             map_info = info["map info"]
             lon = int(info["samples"])
