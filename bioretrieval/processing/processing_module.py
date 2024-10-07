@@ -7,6 +7,7 @@ import logging
 import os
 import shutil
 from datetime import datetime
+from shutil import copyfile, rmtree
 
 from bioretrieval.auxiliar.logger_class import Logger
 from bioretrieval.processing.retrieval import Retrieval
@@ -112,10 +113,10 @@ def bio_retrieval_module(
             try:
                 input_file_geo = input_files[i].replace("IMG", "GEO")
                 l2b_output_file_geo = l2b_output_files[i].replace("IMG", "GEO")
-                shutil.copyfile(input_file_geo, l2b_output_file_geo)
+                copyfile(input_file_geo, l2b_output_file_geo)
                 input_file_qua = input_files[i].replace("IMG", "QUA")
                 l2b_output_file_qua = l2b_output_files[i].replace("IMG", "QUA")
-                shutil.copyfile(input_file_qua, l2b_output_file_qua)
+                copyfile(input_file_qua, l2b_output_file_qua)
             except FileNotFoundError as e:
                 logging.error(f"Error: {e}")
                 show_message("Missing complementary files for CHIME image.")
@@ -151,7 +152,7 @@ def bio_retrieval_module(
             if not list_of_files:
                 # If output folder exists, delete it and make a new one
                 if os.path.exists(output_path):
-                    shutil.rmtree(output_path)
+                    rmtree(output_path)
                     os.makedirs(output_path)
                 else:
                     os.makedirs(output_path)
@@ -255,7 +256,7 @@ def make_output_folder(output_path: str) -> bool:
     :return: flag: 1 if overwritten, 0 if not
     """
     if os.path.exists(output_path):
-        shutil.rmtree(output_path)
+        rmtree(output_path)
         os.makedirs(output_path)
         logging.info(
             f"Output folder {output_path} already existed and was overwritten."

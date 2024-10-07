@@ -7,16 +7,11 @@ import logging
 import os
 
 import matplotlib.pyplot as plt
-# Importing packages
-import netCDF4 as nc
-import numpy as np
-import spectral.io.envi as envi
-from pyproj import Proj
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+# Importing packages
+from netCDF4 import Dataset
+from pyproj import Proj
+from spectral.io.envi import open
 
 
 # __________________________netCDF handle____________________________
@@ -27,15 +22,14 @@ def read_netcdf(path, conversion_factor):
     :param conversion_factor: image conversion factor
     :return: data cube of reflectance image, wavelength list
     """
-    try:
-        # Read netCDF image ! Cannot be accent in the path!
-        ds_im = nc.Dataset(path)
-        # Converting reflectance data into numpy array, scaling 1/10000
-        # Scale is calculated from: image scale 1/100, difference between image
-        # values and GPR RTM reflectance values
-        np_refl = ds_im["l2a_BOA_rfl"][:]
-        np_refl = np_refl.data
-        data_refl = np_refl * conversion_factor
+    # Read netCDF image ! Cannot be accent in the path!
+    ds_im = Dataset(path)
+    # Converting reflectance data into numpy array, scaling 1/10000
+    # Scale is calculated from: image scale 1/100, difference between image
+    # values and GPR RTM reflectance values
+    np_refl = ds_im["l2a_BOA_rfl"][:]
+    np_refl = np_refl.data
+    data_refl = np_refl * conversion_factor
 
         # Saving image wavelengths
         data_wavelength = ds_im["central_wavelength"][:]
@@ -58,15 +52,13 @@ def read_envi(path: str, conversion_factor: float) -> tuple:
     :return: data cube of reflectance image, wavelength list
     optional: returns latitude & longitude list if map information is available
     """
-    try:
-        # Open the ENVI file
-        envi_image = envi.open(
-            path,
-            os.path.join(
-                os.path.dirname(path),
-                os.path.splitext(os.path.basename(path))[0],
-            ),
-        )
+    # Open the ENVI file
+    envi_image = open(
+        path,
+        os.path.join(
+            os.path.dirname(path), os.path.splitext(os.path.basename(path))[0]
+        ),
+    )
 
         # Load the data into a NumPy array
         data = envi_image.asarray()
@@ -75,12 +67,14 @@ def read_envi(path: str, conversion_factor: float) -> tuple:
         # Storing all the metadata
         info = envi_image.metadata
 
-        # Storing wavelengths
-        data_wavelength = [
-            int(float(wavelength))
-            for wavelength in envi_image.metadata["wavelength"]
-        ]
-        data_wavelength = np.array(data_wavelength)
+    # Storing wavelengths
+    data_wavelength = list(
+        map(
+            lambda wavelength: int(float(wavelength)),
+            envi_image.metadata["wavelength"],
+        )
+    )
+    data_wavelength = np.array(data_wavelength)
 
         # Obtain lat,lon (transform UTM coordinates)
         if "map info" in info:
@@ -162,25 +156,22 @@ def show_reflectance_img(data_refl: np.ndarray, data_wavelength: np.ndarray):
     :param data_wavelength: list of wavelengths
     :return: no return value just plotting the image
     """
-    try:
-        # Defining wavelength RGB
-        indexes = np.zeros(3)
-        values_to_find = [639, 547, 463]
-        # Find the index closest to each value
-        for i, value in enumerate(values_to_find):
-            closest_index = np.abs(data_wavelength - value).argmin()
-            indexes[i] = closest_index
-        idx_int = indexes.astype(np.uint8)
-        data_r_for_show = data_refl[:, :, idx_int]
-        # Normalise image
-        data_r_for_show_norm = (data_r_for_show - np.min(data_r_for_show)) / (
-            np.max(data_r_for_show) - np.min(data_r_for_show)
-        )
-        # Showing the image
-        plt.imshow(data_r_for_show_norm, interpolation="nearest")
-        plt.title("Reflectance image (RGB)")
-        plt.colorbar()
-        plt.show()
-    except Exception as e:
-        logging.error(f"Error showing reflectance image: {e}")
-        raise
+    # Defining wavelength RGB
+    values_to_find = np.array([639, 547, 463])
+
+    # Find the index closest to each value using broadcasting and argmin
+    diff = np.abs(data_wavelength[:, np.newaxis] - values_to_find)
+    indexes = np.argmin(diff, axis=0).astype(np.uint8)
+
+    data_r_for_show = data_refl[:, :, indexes]
+
+    # Normalise image
+    data_r_for_show_norm = (data_r_for_show - np.min(data_r_for_show)) / (
+        np.max(data_r_for_show) - np.min(data_r_for_show)
+    )
+
+    # Showing the image
+    plt.imshow(data_r_for_show_norm, interpolation="nearest")
+    plt.title("Reflectance image (RGB)")
+    plt.colorbar()
+    plt.show()

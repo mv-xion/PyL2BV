@@ -3,18 +3,21 @@
     from reading the image to writing the retrieved result
 """
 
+
 import importlib
 import logging
 import os
 import pickle
 import sys
-import time
+from time import time
 
-import netCDF4 as nc
 import numpy as np
 from matplotlib import pyplot as plt
+from netCDF4 import Dataset
 from spectral.io import envi
 
+from bioretrieval.auxiliar.image_read import (read_envi, read_netcdf,
+                                              show_reflectance_img)
 from bioretrieval.auxiliar.image_read import (read_envi, read_netcdf,
                                               show_reflectance_img)
 from bioretrieval.auxiliar.logger_class import Logger
@@ -75,7 +78,7 @@ class Retrieval:
         self.logger.open()
         logging.info("Reading image...")
         self.show_message("Reading image...")
-        self.start = time.time()
+        self.start = time()
         # __________________________Split image read by file type______________
 
         if self.input_type == "CHIME netCDF":
@@ -95,7 +98,7 @@ class Retrieval:
             else:
                 self.show_message("No map info")
                 self.map_info = False
-        self.end = time.time()
+        self.end = time()
         self.process_time = self.end - self.start
         self.rows, self.cols, self.dims = self.img_reflectance.shape
 
@@ -122,9 +125,9 @@ class Retrieval:
             self.show_message(str(e))
             self.logger.log_message(f"{e}\n")
             return True
-        list_of_models = [
-            file for file in list_of_files if file.endswith(".py")
-        ]
+        list_of_models = list(
+            filter(lambda file: file.endswith(".py"), list_of_files)
+        )
         self.number_of_models = len(list_of_models)
         logging.info(
             f"Getting model {self.number_of_models} names was successful."
@@ -138,17 +141,28 @@ class Retrieval:
 
         # Importing the models
         sys.path.append(self.model_path)
+
         # Reading the models
-        for i in range(len(list_of_models)):
+        def import_and_log_model(model_file, bio_models, show_message, logger):
             # Importing model
-            self.bio_models.append(
-                importlib.import_module(
-                    os.path.splitext(list_of_models[i])[0], package=None
-                )
+            module = importlib.import_module(
+            os.path.splitext(model_file)[0], package=None
             )
-            logging.info(f"{self.bio_models[i].model} imported")
-            self.show_message(f"{self.bio_models[i].model} imported")
-            self.logger.log_message(f"{self.bio_models[i].model} imported\n")
+            bio_models.append(module)
+            message = f"{module.model} imported"
+            logging.info(message)
+            show_message(message)
+            logger.log_message(message + "\n")
+
+        # Assuming self.bio_models, self.show_message, and self.logger are defined
+        list(
+            map(
+                lambda model_file: import_and_log_model(
+                    model_file, self.bio_models, self.show_message, self.logger
+                ),
+                list_of_models,
+            )
+        )
 
         # _________________________________Retrieval___________________________________________
 
@@ -164,9 +178,9 @@ class Retrieval:
             self.show_message("Band selection...")
 
             # Band selection of the image
-            self.start = time.time()
+            self.start = time()
             data_refl_new = self.band_selection(i)
-            self.end = time.time()
+            self.end = time()
             self.process_time = self.end - self.start
 
             logging.info(
@@ -210,11 +224,11 @@ class Retrieval:
                 self.show_message("Running GPR...")
 
                 gpr_object = MLRA_GPR(self.img_array, model_dict)
-                self.start = time.time()
+                self.start = time()
 
                 # Starting GPR
                 variable_map, uncertainty_map = gpr_object.perform_mlra
-                self.end = time.time()
+                self.end = time()
 
                 # Logging
                 self.process_time = self.end - self.start
@@ -271,14 +285,14 @@ class Retrieval:
         self.logger.open()
         logging.info("Exporting image...")
         self.show_message("Exporting image...")
-        self.start = time.time()
+        self.start = time()
         # __________________________Split image read by file type______________
 
         if self.input_type == "CHIME netCDF":
             self.export_netcdf()
         elif self.input_type == "ENVI Standard":
             self.export_envi()
-        self.end = time.time()
+        self.end = time()
         self.process_time = self.end - self.start
 
         logging.info(f"Image exported. Elapsed time:{self.process_time}")
@@ -298,7 +312,7 @@ class Retrieval:
     def export_netcdf(self):
         # Creating output image
         # Create a new netCDF file
-        nc_file = nc.Dataset(self.output_file, "w", format="NETCDF4")
+        nc_file = Dataset(self.output_file, "w", format="NETCDF4")
 
         # Set global attributes
         nc_file.title = "CHIME-E2E Level-2B product data"
