@@ -13,6 +13,7 @@ import tkinter as tk
 from tkinter import filedialog, ttk
 
 from bioretrieval.processing.processing_module import bio_retrieval_module
+import time
 
 # Configure logging
 logging.basicConfig(
@@ -209,8 +210,11 @@ class SimpleGUI(tk.Tk):
         ps.print_stats()
         
         # Save the profiling results to a file
-        with open("profiling_results.txt", "w") as f:
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        profiling_filename = f"profiling_results_{timestamp}.txt"
+        with open(profiling_filename, "w") as f:
             f.write(s.getvalue())
+        logging.info(f"Profiling results saved to {profiling_filename}")
 
         # Stop the progress bar
         self.progress_bar.stop()
