@@ -1,6 +1,7 @@
 """
     Defining a logger class
 """
+
 import atexit
 
 

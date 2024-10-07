@@ -2,15 +2,15 @@
     This file is handling the functions for the
     reflectance image. For CHIME and ENVI formats
 """
+
 import os
 
 import matplotlib.pyplot as plt
-
-# Importing packages
-import netCDF4 as nc
 import numpy as np
-import spectral.io.envi as envi
+# Importing packages
+from netCDF4 import Dataset
 from pyproj import Proj
+from spectral.io.envi import open
 
 
 # __________________________netCDF handle____________________________
@@ -22,7 +22,7 @@ def read_netcdf(path, conversion_factor):
     :return: data cube of reflectance image, wavelength list
     """
     # Read netCDF image ! Cannot be accent in the path!
-    ds_im = nc.Dataset(path)
+    ds_im = Dataset(path)
     # Converting reflectance data into numpy array, scaling 1/10000
     # Scale is calculated from: image scale 1/100, difference between image
     # values and GPR RTM reflectance values
@@ -49,7 +49,7 @@ def read_envi(path: str, conversion_factor: float) -> tuple:
     optional: returns latitude & longitude list if map information is available
     """
     # Open the ENVI file
-    envi_image = envi.open(
+    envi_image = open(
         path,
         os.path.join(
             os.path.dirname(path), os.path.splitext(os.path.basename(path))[0]
@@ -64,10 +64,12 @@ def read_envi(path: str, conversion_factor: float) -> tuple:
     info = envi_image.metadata
 
     # Storing wavelengths
-    data_wavelength = [
-        int(float(wavelength))
-        for wavelength in envi_image.metadata["wavelength"]
-    ]
+    data_wavelength = list(
+        map(
+            lambda wavelength: int(float(wavelength)),
+            envi_image.metadata["wavelength"],
+        )
+    )
     data_wavelength = np.array(data_wavelength)
 
     # Obtain lat,lon (transform UTM coordinates)
@@ -144,18 +146,19 @@ def show_reflectance_img(data_refl: np.ndarray, data_wavelength: np.ndarray):
     :return: no return value just plotting the image
     """
     # Defining wavelength RGB
-    indexes = np.zeros(3)
-    values_to_find = [639, 547, 463]
-    # Find the index closest to each value
-    for i, value in enumerate(values_to_find):
-        closest_index = np.abs(data_wavelength - value).argmin()
-        indexes[i] = closest_index
-    idx_int = indexes.astype(np.uint8)
-    data_r_for_show = data_refl[:, :, idx_int]
+    values_to_find = np.array([639, 547, 463])
+
+    # Find the index closest to each value using broadcasting and argmin
+    diff = np.abs(data_wavelength[:, np.newaxis] - values_to_find)
+    indexes = np.argmin(diff, axis=0).astype(np.uint8)
+
+    data_r_for_show = data_refl[:, :, indexes]
+
     # Normalise image
     data_r_for_show_norm = (data_r_for_show - np.min(data_r_for_show)) / (
         np.max(data_r_for_show) - np.min(data_r_for_show)
     )
+
     # Showing the image
     plt.imshow(data_r_for_show_norm, interpolation="nearest")
     plt.title("Reflectance image (RGB)")
