@@ -243,7 +243,6 @@ class SimpleGUI(tk.Tk):
         """
         self.text_widget.insert(tk.END, message + "\n")
         self.text_widget.see(tk.END)  # Scroll to the end of the text widget
-        logging.info(f"Message displayed: {message}")
 
 
 class NonNegativeNumberEntry(tk.Entry):

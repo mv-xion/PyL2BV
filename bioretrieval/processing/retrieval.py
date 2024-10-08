@@ -227,7 +227,7 @@ class Retrieval:
                 self.start = time()
 
                 # Starting GPR
-                variable_map, uncertainty_map = gpr_object.perform_mlra
+                variable_map, uncertainty_map = gpr_object.perform_mlra()
                 self.end = time()
 
                 # Logging
@@ -368,8 +368,8 @@ class Retrieval:
 
             # Assign data to the variable
             # Transpose for matlab type output
-            retrieval_var[:] = np.transpose(self.variable_maps[i])
-            sd_var[:] = np.transpose(self.uncertainty_maps[i])
+            # retrieval_var[:] = np.transpose(self.variable_maps[i])
+            # sd_var[:] = np.transpose(self.uncertainty_maps[i])
 
         logging.info(
             f"NetCDF file created successfully at: {self.output_file}"
@@ -477,61 +477,61 @@ class Retrieval:
             else:
                 colormap = "viridis"
 
-            # Showing the result image
-            plt.imshow(self.variable_maps[i], cmap=colormap)
-            if self.bio_models[i].veg_index == "LAI":
-                plt.title(
-                    f"Estimated {self.bio_models[i].veg_index} map (m$^2$/m$^2$)"
-                )
-            else:
-                plt.title(
-                    f"Estimated {self.bio_models[i].veg_index} map (g/m$^2$)"
-                )
-            plt.colorbar()
-            plt.tight_layout()
-            plt.savefig(
-                os.path.join(
-                    img_dir,
-                    f"{os.path.basename(self.output_file)}{self.bio_models[i].veg_index}.png",
-                ),
-                bbox_inches="tight",
-            )
-            plt.savefig(
-                os.path.join(
-                    vec_dir,
-                    f"{os.path.basename(self.output_file)}{self.bio_models[i].veg_index}.pdf",
-                ),
-                bbox_inches="tight",
-            )
-            plt.show()
+            # # Showing the result image
+            # plt.imshow(self.variable_maps[i], cmap=colormap)
+            # if self.bio_models[i].veg_index == "LAI":
+            #     plt.title(
+            #         f"Estimated {self.bio_models[i].veg_index} map (m$^2$/m$^2$)"
+            #     )
+            # else:
+            #     plt.title(
+            #         f"Estimated {self.bio_models[i].veg_index} map (g/m$^2$)"
+            #     )
+            # plt.colorbar()
+            # plt.tight_layout()
+            # plt.savefig(
+            #     os.path.join(
+            #         img_dir,
+            #         f"{os.path.basename(self.output_file)}{self.bio_models[i].veg_index}.png",
+            #     ),
+            #     bbox_inches="tight",
+            # )
+            # plt.savefig(
+            #     os.path.join(
+            #         vec_dir,
+            #         f"{os.path.basename(self.output_file)}{self.bio_models[i].veg_index}.pdf",
+            #     ),
+            #     bbox_inches="tight",
+            # )
+            # plt.show()
 
-            # Showing the uncertainty image
-            plt.imshow(self.uncertainty_maps[i], cmap="jet")
-            if self.bio_models[i].veg_index == "LAI":
-                plt.title(
-                    f"Uncertainty of {self.bio_models[i].veg_index} map (m$^2$/m$^2$)"
-                )
-            else:
-                plt.title(
-                    f"Uncertainty of {self.bio_models[i].veg_index} map (g/m$^2$)"
-                )
-            plt.colorbar()
-            plt.tight_layout()
-            plt.savefig(
-                os.path.join(
-                    img_dir,
-                    f"{os.path.basename(self.output_file)}{self.bio_models[i].veg_index}_uncertainty.png",
-                ),
-                bbox_inches="tight",
-            )
-            plt.savefig(
-                os.path.join(
-                    vec_dir,
-                    f"{os.path.basename(self.output_file)}{self.bio_models[i].veg_index}_uncertainty.pdf",
-                ),
-                bbox_inches="tight",
-            )
-            plt.show()
+            # # Showing the uncertainty image
+            # plt.imshow(self.uncertainty_maps[i], cmap="jet")
+            # if self.bio_models[i].veg_index == "LAI":
+            #     plt.title(
+            #         f"Uncertainty of {self.bio_models[i].veg_index} map (m$^2$/m$^2$)"
+            #     )
+            # else:
+            #     plt.title(
+            #         f"Uncertainty of {self.bio_models[i].veg_index} map (g/m$^2$)"
+            #     )
+            # plt.colorbar()
+            # plt.tight_layout()
+            # plt.savefig(
+            #     os.path.join(
+            #         img_dir,
+            #         f"{os.path.basename(self.output_file)}{self.bio_models[i].veg_index}_uncertainty.png",
+            #     ),
+            #     bbox_inches="tight",
+            # )
+            # plt.savefig(
+            #     os.path.join(
+            #         vec_dir,
+            #         f"{os.path.basename(self.output_file)}{self.bio_models[i].veg_index}_uncertainty.pdf",
+            #     ),
+            #     bbox_inches="tight",
+            # )
+            # plt.show()
 
 
 # Normalise data function

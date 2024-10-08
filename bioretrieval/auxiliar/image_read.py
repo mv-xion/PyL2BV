@@ -172,7 +172,7 @@ def show_reflectance_img(data_refl: np.ndarray, data_wavelength: np.ndarray):
     )
 
     # Showing the image
-    plt.imshow(data_r_for_show_norm, interpolation="nearest")
-    plt.title("Reflectance image (RGB)")
-    plt.colorbar()
-    plt.show()
+    # plt.imshow(data_r_for_show_norm, interpolation="nearest")
+    # plt.title("Reflectance image (RGB)")
+    # plt.colorbar()
+    # plt.show()
