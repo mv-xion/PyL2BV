@@ -243,7 +243,7 @@ def bio_retrieval_module(
                 return 1
 
         logging.info(f"Retrieval of {img_name} successful.")
-        show_message(f"Retrieval of {img_name} successful.")
+        # show_message(f"Retrieval of {img_name} successful.")
         with open(f"{log_path}_logfile.log", "a") as log_file_id:
             log_file_id.write(f"Retrieval of {img_name} successful.\n")
     return 0

@@ -55,7 +55,7 @@ def read_envi(path: str, conversion_factor: float) -> tuple:
     """
     try:
         # Open the ENVI file
-        envi_image = open_image(
+        envi_image = open(
             os.path.join(
                 os.path.dirname(path), os.path.splitext(os.path.basename(path))[0]
             )
