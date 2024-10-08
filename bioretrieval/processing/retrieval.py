@@ -227,7 +227,7 @@ class Retrieval:
                 self.start = time()
 
                 # Starting GPR
-                variable_map, uncertainty_map = gpr_object.perform_mlra()
+                variable_map, uncertainty_map = gpr_object.perform_mlra
                 self.end = time()
 
                 # Logging
@@ -368,8 +368,8 @@ class Retrieval:
 
             # Assign data to the variable
             # Transpose for matlab type output
-            # retrieval_var[:] = np.transpose(self.variable_maps[i])
-            # sd_var[:] = np.transpose(self.uncertainty_maps[i])
+            retrieval_var[:] = np.transpose(self.variable_maps[i])
+            sd_var[:] = np.transpose(self.uncertainty_maps[i])
 
         logging.info(
             f"NetCDF file created successfully at: {self.output_file}"
