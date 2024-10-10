@@ -2,13 +2,9 @@
     GUI for BioRetrieval programme using the tkinter library
 """
 
-import cProfile
-import io
 import logging
 import os
-import pstats
 import threading
-import time
 import tkinter as tk
 from tkinter import filedialog, ttk
 
@@ -212,10 +208,6 @@ class SimpleGUI(tk.Tk):
         """
         logging.info("Running model.")
 
-        # Start profiling
-        pr = cProfile.Profile()
-        pr.enable()
-
         message = bio_retrieval_module(
             input_folder_path,
             input_type,
@@ -223,20 +215,6 @@ class SimpleGUI(tk.Tk):
             conversion_factor,
             self.show_message,
         )
-
-        # Stop profiling
-        pr.disable()
-        s = io.StringIO()
-        sortby = "cumulative"
-        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-        ps.print_stats()
-
-        # Save the profiling results to a file
-        timestamp = time.strftime("%Y%m%d-%H%M%S")
-        profiling_filename = f"profiling_results_{timestamp}.txt"
-        with open(profiling_filename, "w") as f:
-            f.write(s.getvalue())
-        logging.info(f"Profiling results saved to {profiling_filename}")
 
         if message == 1:
             completion_message = "Something went wrong"
