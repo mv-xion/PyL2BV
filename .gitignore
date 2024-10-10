@@ -1,3 +1,5 @@
 
 /input
 /output
+__pycache__/
+*.txt
