@@ -3,7 +3,6 @@
     from reading the image to writing the retrieved result
 """
 
-
 import importlib
 import logging
 import os
@@ -16,8 +15,6 @@ from matplotlib import pyplot as plt
 from netCDF4 import Dataset
 from spectral.io import envi
 
-from bioretrieval.auxiliar.image_read import (read_envi, read_netcdf,
-                                              show_reflectance_img)
 from bioretrieval.auxiliar.image_read import (read_envi, read_netcdf,
                                               show_reflectance_img)
 from bioretrieval.auxiliar.logger_class import Logger
@@ -146,7 +143,7 @@ class Retrieval:
         def import_and_log_model(model_file, bio_models, show_message, logger):
             # Importing model
             module = importlib.import_module(
-            os.path.splitext(model_file)[0], package=None
+                os.path.splitext(model_file)[0], package=None
             )
             bio_models.append(module)
             message = f"{module.model} imported"
