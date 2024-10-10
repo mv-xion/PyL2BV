@@ -3,6 +3,7 @@
     from reading the image to writing the retrieved result
 """
 
+import concurrent.futures
 import importlib
 import logging
 import os
@@ -163,8 +164,7 @@ class Retrieval:
 
         # _________________________________Retrieval___________________________________________
 
-        for i in range(self.number_of_models):
-            # Running each model on the image
+        def run_model(i):
             logging.info(f"Running {self.bio_models[i].model} model")
             self.show_message(f"Running {self.bio_models[i].model} model")
             self.logger.log_message(
@@ -224,7 +224,7 @@ class Retrieval:
                 self.start = time()
 
                 # Starting GPR
-                variable_map, uncertainty_map = gpr_object.perform_mlra
+                variable_map, uncertainty_map = gpr_object.perform_mlra()
                 self.end = time()
 
                 # Logging
@@ -246,6 +246,15 @@ class Retrieval:
                 self.logger.log_message(
                     f"Retrieval of {self.bio_models[i].veg_index} was successful.\n"
                 )
+
+        # Use ThreadPoolExecutor to run models in parallel
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = [
+                executor.submit(run_model, i)
+                for i in range(self.number_of_models)
+            ]
+            for future in concurrent.futures.as_completed(futures):
+                future.result()  # This will raise any exceptions caught during execution
 
         # _________________________________Finishing tasks_____________________
         self.logger.close()
