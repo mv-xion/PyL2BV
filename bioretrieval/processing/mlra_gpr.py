@@ -1,20 +1,13 @@
-# GPR class
-
 import logging
 import math
 from multiprocessing import Pool, cpu_count
 
 import numpy as np
+from joblib import Parallel, delayed
 
 from bioretrieval.processing.mlra import MLRA_Methods
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
 
-
-# GPRMapping inherits from MLRA_Methods
 class MLRA_GPR(MLRA_Methods):
     def __init__(self, image: np.ndarray, bio_model) -> None:
         super().__init__(image, bio_model)
@@ -25,8 +18,10 @@ class MLRA_GPR(MLRA_Methods):
         self.X_train_GREEN = bio_model["X_train_GREEN"]
         self.mean_model_GREEN = bio_model["mean_model_GREEN"]
         self.hyp_sig_GREEN = bio_model["hyp_sig_GREEN"]
-        self.XDX_pre_calc_GREEN = bio_model["XDX_pre_calc_GREEN"]
-        self.alpha_coefficients_GREEN = bio_model["alpha_coefficients_GREEN"]
+        self.XDX_pre_calc_GREEN = bio_model["XDX_pre_calc_GREEN"].flatten()
+        self.alpha_coefficients_GREEN = bio_model[
+            "alpha_coefficients_GREEN"
+        ].flatten()
         self.Linv_pre_calc_GREEN = bio_model["Linv_pre_calc_GREEN"]
         self.hyp_sig_unc_GREEN = bio_model["hyp_sig_unc_GREEN"]
 
@@ -73,27 +68,53 @@ class MLRA_GPR(MLRA_Methods):
             logging.error(f"Error in GPR_mapping_pixel: {e}")
             raise
 
-    @property
+    def process_pixel_batch(self, batch: np.ndarray) -> tuple:
+        im_norm_ell2D = batch
+        im_norm_ell2D_hypell = im_norm_ell2D * self.hyp_ell_GREEN
+
+        PtTPt = -0.5 * np.sum(im_norm_ell2D_hypell * im_norm_ell2D, axis=1)
+        PtTDX = im_norm_ell2D_hypell @ self.X_train_GREEN.T
+
+        arg1 = np.exp(PtTPt) * self.hyp_sig_GREEN
+        k_star = np.exp(PtTDX - (0.5 * self.XDX_pre_calc_GREEN))
+
+        mean_pred = (
+            k_star @ self.alpha_coefficients_GREEN
+        ) * arg1 + self.mean_model_GREEN
+        mean_pred = np.maximum(mean_pred, 0)
+
+        k_star_uncert = k_star * arg1[:, np.newaxis]
+        Vvector = self.Linv_pre_calc_GREEN @ k_star_uncert.T
+        Variance = np.sqrt(
+            np.abs(self.hyp_sig_unc_GREEN - np.sum(Vvector**2, axis=0))
+        )
+
+        return mean_pred, Variance
+
     def perform_mlra(self) -> tuple:
         try:
             logging.info("Starting perform_mlra.")
             ydim, xdim = self.image.shape[1:]
+            num_pixels = ydim * xdim
 
-            variable_map = np.empty((ydim, xdim))
-            uncertainty_map = np.empty((ydim, xdim))
+            pixels = self.image.reshape(self.image.shape[0], num_pixels).T
 
-            args_list = [
-                self.image[:, f, v] for f in range(ydim) for v in range(xdim)
-            ]
+            # Split into smaller batches for parallel processing
+            num_cores = cpu_count()
+            batch_size = num_pixels // num_cores
+            pixel_batches = np.array_split(pixels, num_cores)
 
-            with Pool(processes=cpu_count()) as pool:
-                results = pool.map(self.GPR_mapping_pixel, args_list)
+            # Parallelize pixel batch processing
+            results = Parallel(n_jobs=num_cores)(
+                delayed(self.process_pixel_batch)(batch)
+                for batch in pixel_batches
+            )
 
-            for i, (mean_pred, Variance) in enumerate(results):
-                f = i // xdim
-                v = i % xdim
-                variable_map[f, v] = mean_pred
-                uncertainty_map[f, v] = Variance
+            mean_pred = np.concatenate([res[0] for res in results])
+            Variance = np.concatenate([res[1] for res in results])
+
+            variable_map = mean_pred.reshape(ydim, xdim)
+            uncertainty_map = Variance.reshape(ydim, xdim)
 
             logging.info("Completed perform_mlra.")
             return variable_map, uncertainty_map
