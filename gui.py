@@ -4,16 +4,15 @@
 
 import cProfile
 import io
-import pstats
-
 import logging
 import os
+import pstats
 import threading
+import time
 import tkinter as tk
 from tkinter import filedialog, ttk
 
 from bioretrieval.processing.processing_module import bio_retrieval_module
-import time
 
 # Configure logging
 logging.basicConfig(
@@ -27,6 +26,7 @@ class SimpleGUI(tk.Tk):
         self.title("Retrieval of biophysical variables")
         self.create_widgets()
         logging.info("Initialized SimpleGUI.")
+        self.model_thread = None
 
     def create_widgets(self):
         default_folder = os.getcwd()
@@ -156,7 +156,7 @@ class SimpleGUI(tk.Tk):
                 self.text_widget.pack(pady=5)
 
                 # Run the model in a separate thread
-                threading.Thread(
+                self.model_thread = threading.Thread(
                     target=self.run_model,
                     args=(
                         input_folder_path,
@@ -164,14 +164,36 @@ class SimpleGUI(tk.Tk):
                         model_folder_path,
                         conversion_factor,
                     ),
-                ).start()
+                )
+                self.model_thread.start()
+
+                # Check the thread status periodically
+                self.check_thread_status()
             else:
                 raise FileNotFoundError(
                     "Invalid or no input or model folder selected"
                 )
         except Exception as e:
-            logging.error("Error occurred while starting model thread", exc_info=True)
+            logging.error(
+                "Error occurred while starting model thread", exc_info=True
+            )
             self.show_message("Error occurred while starting model thread")
+
+    def check_thread_status(self):
+        if self.model_thread.is_alive():
+            self.after(100, self.check_thread_status)
+        else:
+            self.on_model_thread_complete()
+
+    def on_model_thread_complete(self):
+        # Stop the progress bar
+        self.progress_bar.stop()
+
+        # Enable the Run button
+        self.button_run.config(state=tk.NORMAL)
+
+        # Close the progress window
+        self.progress_window.destroy()
 
     def run_model(
         self,
@@ -189,7 +211,7 @@ class SimpleGUI(tk.Tk):
         :return: Shows completion message and is able to run again
         """
         logging.info("Running model.")
-        
+
         # Start profiling
         pr = cProfile.Profile()
         pr.enable()
@@ -205,19 +227,16 @@ class SimpleGUI(tk.Tk):
         # Stop profiling
         pr.disable()
         s = io.StringIO()
-        sortby = 'cumulative'
+        sortby = "cumulative"
         ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
         ps.print_stats()
-        
+
         # Save the profiling results to a file
         timestamp = time.strftime("%Y%m%d-%H%M%S")
         profiling_filename = f"profiling_results_{timestamp}.txt"
         with open(profiling_filename, "w") as f:
             f.write(s.getvalue())
         logging.info(f"Profiling results saved to {profiling_filename}")
-
-        # Stop the progress bar
-        self.progress_bar.stop()
 
         if message == 1:
             completion_message = "Something went wrong"
@@ -229,20 +248,12 @@ class SimpleGUI(tk.Tk):
             completion_message = "Unknown Error"
             logging.warning(completion_message)
 
-        # Display completion message
-        self.progress_label.config(text=completion_message)
+        # Schedule the display of the completion message in the main thread
+        self.after(0, self.show_message, completion_message)
 
-        # Enable the Run button after the progress window is closed
-        self.button_run.config(state=tk.NORMAL)
-
-    def show_message(self, message: str):
-        """
-        Show message function for the GUI
-        :param message: message to show
-        :return:
-        """
+    def show_message(self, message):
         self.text_widget.insert(tk.END, message + "\n")
-        self.text_widget.see(tk.END)  # Scroll to the end of the text widget
+        self.text_widget.see(tk.END)
 
 
 class NonNegativeNumberEntry(tk.Entry):
