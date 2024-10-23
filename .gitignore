@@ -1,5 +1,6 @@
 
 /input
 /output
+/.idea
 __pycache__/
 *.txt
