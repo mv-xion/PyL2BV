@@ -16,7 +16,6 @@ joblib==1.4.2
 kiwisolver==1.4.7
 llvmlite==0.43.0
 locket==1.0.0
-logging==0.4.9.6
 MarkupSafe==3.0.0
 matplotlib==3.9.2
 mccabe==0.7.0

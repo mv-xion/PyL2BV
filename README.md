@@ -14,7 +14,7 @@ Ensure you have Python 3.10.12 installed on your system.
 
 1. Create a virtual environment:
     ```bash
-    python3 -m venv myenv
+    python -m venv myenv
     ```
 2. Activate the virtual environment:
     - On macOS/Linux:
