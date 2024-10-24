@@ -16,14 +16,14 @@ from matplotlib import pyplot as plt
 from netCDF4 import Dataset
 from spectral.io import envi
 
-from bioretrieval.auxiliar.image_read import (
+from pyl2bv_code.auxiliar.image_read import (
     read_envi,
     read_netcdf,
     show_reflectance_img,
 )
-from bioretrieval.auxiliar.logger_class import Logger
-from bioretrieval.auxiliar.spectra_interpolation import spline_interpolation
-from bioretrieval.processing.mlra_gpr import MLRA_GPR
+from pyl2bv_code.auxiliar.logger_class import Logger
+from pyl2bv_code.auxiliar.spectra_interpolation import spline_interpolation
+from pyl2bv_code.processing.mlra_gpr import MLRA_GPR
 
 # Configure logging
 logging.basicConfig(
@@ -76,7 +76,6 @@ class Retrieval:
         self.output_file = output_file
         self.model_path = model_path
 
-    # TODO: Try catch blocks, exceptions
     @property
     def bio_retrieval(self) -> bool:
         self.logger.open()

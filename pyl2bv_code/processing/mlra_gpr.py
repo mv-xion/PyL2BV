@@ -5,7 +5,7 @@ from multiprocessing import Pool, cpu_count
 import numpy as np
 from joblib import Parallel, delayed
 
-from bioretrieval.processing.mlra import MLRA_Methods
+from pyl2bv_code.processing.mlra import MLRA_Methods
 
 
 class MLRA_GPR(MLRA_Methods):

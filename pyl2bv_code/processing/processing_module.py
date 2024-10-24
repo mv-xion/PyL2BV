@@ -9,8 +9,8 @@ import shutil
 from datetime import datetime
 from shutil import copyfile, rmtree
 
-from bioretrieval.auxiliar.logger_class import Logger
-from bioretrieval.processing.retrieval import Retrieval
+from pyl2bv_code.auxiliar.logger_class import Logger
+from pyl2bv_code.processing.retrieval import Retrieval
 
 # Configure logging
 logging.basicConfig(
@@ -18,7 +18,7 @@ logging.basicConfig(
 )
 
 
-def bio_retrieval_module(
+def pyl2bv_processing(
     input_folder_path: str,
     input_type: str,
     model_folder_path: str,

@@ -9,7 +9,7 @@ import webbrowser
 import tkinter as tk
 from tkinter import filedialog, ttk
 
-from bioretrieval.processing.processing_module import bio_retrieval_module
+from pyl2bv_code.processing.processing_module import pyl2bv_processing
 
 # Configure logging
 logging.basicConfig(
@@ -20,7 +20,7 @@ logging.basicConfig(
 class SimpleGUI(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Retrieval of biophysical variables")
+        self.title("PyL2BV for the retrieval of biophysical variables")
         self.create_widgets()
         self.create_menu()  # Initialize the menu
         logging.info("Initialized SimpleGUI.")
@@ -253,7 +253,7 @@ class SimpleGUI(tk.Tk):
         """
         logging.info("Running model.")
 
-        message = bio_retrieval_module(
+        message = pyl2bv_processing(
             input_folder_path,
             input_type,
             model_folder_path,
