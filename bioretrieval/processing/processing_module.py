@@ -24,16 +24,18 @@ def bio_retrieval_module(
     model_folder_path: str,
     conversion_factor: float,
     show_message: callable,
+    plotting: bool,
 ):
     """
-    Bio Retrieval module for ARTMO based models:
-     LEO-IPL - University of Valencia. June 2024.
-     by Mészáros Viktor Ixion
+    PyL2BV retrieval module for ARTMO based models:
+    LEO-IPL - University of Valencia. June 2024.
+    by Mészáros Viktor Ixion
 
     This function reads all the files in the folder input_folder_path and
     reads the indicated input_type than starts the retrieval process with the models
     specified in model_folder_path.
     Parameters:
+    :param plotting: bool to plot the results or not
     :type conversion_factor: conversion factor for the retrieval
     :param input_folder_path: path to folder containing input files
     :param input_type: type of input files
@@ -230,6 +232,7 @@ def bio_retrieval_module(
             l2b_output_files[i],
             model_folder_path,
             conversion_factor,
+            plotting,
         )
 
         return_value = retrieval_object.bio_retrieval

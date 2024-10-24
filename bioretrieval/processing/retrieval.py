@@ -16,8 +16,11 @@ from matplotlib import pyplot as plt
 from netCDF4 import Dataset
 from spectral.io import envi
 
-from bioretrieval.auxiliar.image_read import (read_envi, read_netcdf,
-                                              show_reflectance_img)
+from bioretrieval.auxiliar.image_read import (
+    read_envi,
+    read_netcdf,
+    show_reflectance_img,
+)
 from bioretrieval.auxiliar.logger_class import Logger
 from bioretrieval.auxiliar.spectra_interpolation import spline_interpolation
 from bioretrieval.processing.mlra_gpr import MLRA_GPR
@@ -38,6 +41,7 @@ class Retrieval:
         output_file: str,
         model_path: str,
         conversion_factor: float,
+        plotting: bool,
     ):
         """
         Initialise the retrieval class
@@ -48,7 +52,9 @@ class Retrieval:
         :param output_file: path to the output file
         :param model_path: path to the models directory
         :param conversion_factor: image conversion factor
+        :param plotting: bool to plot the results or not
         """
+        self.plotting = plotting
         self.conversion_factor = conversion_factor
         self.number_of_models = None
         self.bio_models = []  # Storing the models
@@ -107,7 +113,8 @@ class Retrieval:
         )
 
         # Showing image
-        show_reflectance_img(self.img_reflectance, self.img_wavelength)
+        if self.plotting:
+            show_reflectance_img(self.img_reflectance, self.img_wavelength)
 
         # ___________________________Reading models____________________________
 
@@ -292,7 +299,7 @@ class Retrieval:
         logging.info("Exporting image...")
         self.show_message("Exporting image...")
         self.start = time()
-        # __________________________Split image read by file type______________
+        # __________________________Split image export by file type______________
 
         if self.input_type == "CHIME netCDF":
             self.export_netcdf()
@@ -310,7 +317,8 @@ class Retrieval:
         logging.info(f"Show images")
         self.show_message(f"Show images")
         self.logger.log_message(f"Show images")
-        self.show_results()
+        if self.plotting:
+            self.show_results()
 
         self.logger.close()
         return False

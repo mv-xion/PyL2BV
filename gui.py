@@ -156,6 +156,7 @@ class SimpleGUI(tk.Tk):
         model_folder_path = self.entry_model_folder.get()
         input_type = self.input_type_var.get()
         conversion_factor = float(self.entry_conversion_factor.get())
+        plotting = self.plotting_results_var.get()
         try:
             if os.path.isdir(input_folder_path) and os.path.isdir(
                 model_folder_path
@@ -165,6 +166,7 @@ class SimpleGUI(tk.Tk):
                 logging.info(f"Model folder: {model_folder_path}")
                 logging.info(f"Input type: {input_type}")
                 logging.info(f"Conversion factor: {conversion_factor}")
+                logging.info(f"Plotting request: {plotting}")
 
                 # Disable the Run button
                 self.button_run.config(state=tk.DISABLED)
@@ -199,6 +201,7 @@ class SimpleGUI(tk.Tk):
                         input_type,
                         model_folder_path,
                         conversion_factor,
+                        plotting,
                     ),
                 )
                 self.model_thread.start()
@@ -237,9 +240,11 @@ class SimpleGUI(tk.Tk):
         input_type: str,
         model_folder_path: str,
         conversion_factor: float,
+        plotting: bool,
     ):
         """
         This function runs on the new thread and starts the retrieval function
+        :param plotting: bool to plot the results or not
         :param conversion_factor: image conversion factor
         :param input_folder_path: path to the input folder
         :param input_type: type of input file
@@ -254,6 +259,7 @@ class SimpleGUI(tk.Tk):
             model_folder_path,
             conversion_factor,
             self.show_message,
+            plotting,
         )
 
         if message == 1:
