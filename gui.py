@@ -219,10 +219,10 @@ class SimpleGUI(tk.Tk):
         def trace_memory():
             current, peak = tracemalloc.get_traced_memory()
             memory_usage.append((time.time(), current / 10**6, peak / 10**6))
-            self.after(1000, trace_memory)  # Trace memory every second
+            self.after(100, trace_memory)  # Trace memory every 0.1 second
 
         # Start tracing memory in the main thread
-        self.after(1000, trace_memory)
+        self.after(100, trace_memory)
 
         # Run the bio_retrieval_module function
         message = bio_retrieval_module(
