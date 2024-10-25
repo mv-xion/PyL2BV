@@ -1,14 +1,15 @@
 """
-    GUI for BioRetrieval programme using the tkinter library
+    GUI for PyL2BV programme using the tkinter library
 """
 
 import logging
 import os
 import threading
+import webbrowser
 import tkinter as tk
 from tkinter import filedialog, ttk
 
-from bioretrieval.processing.processing_module import bio_retrieval_module
+from pyl2bv_code.processing.processing_module import pyl2bv_processing
 
 # Configure logging
 logging.basicConfig(
@@ -19,13 +20,15 @@ logging.basicConfig(
 class SimpleGUI(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Retrieval of biophysical variables")
+        self.title("PyL2BV for the retrieval of biophysical variables")
         self.create_widgets()
+        self.create_menu()  # Initialize the menu
         logging.info("Initialized SimpleGUI.")
         self.model_thread = None
 
     def create_widgets(self):
         default_folder = os.getcwd()
+
         # Selecting the input folder
         self.label_input_folder = tk.Label(self, text="Select Input Folder:")
         self.label_input_folder.grid(row=0, column=0, padx=5, pady=5)
@@ -80,13 +83,50 @@ class SimpleGUI(tk.Tk):
         self.entry_conversion_factor.insert(0, "0.0001")  # Set default value
         self.entry_conversion_factor.grid(row=1, column=4, padx=5, pady=5)
 
-        # Run button
+        # Move the Run button one row down
         self.button_run = tk.Button(
             self, text="Run", command=self.start_model_thread
         )
-        self.button_run.grid(row=2, column=1, padx=5, pady=5)
+        self.button_run.grid(row=3, column=1, padx=5, pady=5)
 
         logging.info("Created GUI widgets.")
+
+    def create_menu(self):
+        # Creating menu bar
+        self.menu_bar = tk.Menu(self)
+
+        # File menu with Exit button
+        self.file_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.file_menu.add_command(
+            label="Exit", command=self.quit
+        )  # Close the app
+        self.menu_bar.add_cascade(label="File", menu=self.file_menu)
+
+        # Advanced Settings menu with the Plotting results checkbox
+        self.advanced_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.plotting_results_var = tk.BooleanVar()
+        self.advanced_menu.add_checkbutton(
+            label="Plotting results",
+            onvalue=True,
+            offvalue=False,
+            variable=self.plotting_results_var,
+        )
+        self.menu_bar.add_cascade(
+            label="Advanced Settings", menu=self.advanced_menu
+        )
+
+        # Help menu with About button
+        self.help_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.help_menu.add_command(
+            label="About",
+            command=lambda: webbrowser.open(
+                "https://github.com/mv-xion/PyL2BV"
+            ),
+        )  # Open the GitHub repository
+        self.menu_bar.add_cascade(label="Help", menu=self.help_menu)
+
+        # Configuring the menu bar
+        self.config(menu=self.menu_bar)
 
     def browse_input_folder(self):
         input_folder = filedialog.askdirectory(
@@ -116,6 +156,7 @@ class SimpleGUI(tk.Tk):
         model_folder_path = self.entry_model_folder.get()
         input_type = self.input_type_var.get()
         conversion_factor = float(self.entry_conversion_factor.get())
+        plotting = self.plotting_results_var.get()
         try:
             if os.path.isdir(input_folder_path) and os.path.isdir(
                 model_folder_path
@@ -125,6 +166,7 @@ class SimpleGUI(tk.Tk):
                 logging.info(f"Model folder: {model_folder_path}")
                 logging.info(f"Input type: {input_type}")
                 logging.info(f"Conversion factor: {conversion_factor}")
+                logging.info(f"Plotting request: {plotting}")
 
                 # Disable the Run button
                 self.button_run.config(state=tk.DISABLED)
@@ -159,6 +201,7 @@ class SimpleGUI(tk.Tk):
                         input_type,
                         model_folder_path,
                         conversion_factor,
+                        plotting,
                     ),
                 )
                 self.model_thread.start()
@@ -197,9 +240,11 @@ class SimpleGUI(tk.Tk):
         input_type: str,
         model_folder_path: str,
         conversion_factor: float,
+        plotting: bool,
     ):
         """
         This function runs on the new thread and starts the retrieval function
+        :param plotting: bool to plot the results or not
         :param conversion_factor: image conversion factor
         :param input_folder_path: path to the input folder
         :param input_type: type of input file
@@ -208,12 +253,13 @@ class SimpleGUI(tk.Tk):
         """
         logging.info("Running model.")
 
-        message = bio_retrieval_module(
+        message = pyl2bv_processing(
             input_folder_path,
             input_type,
             model_folder_path,
             conversion_factor,
             self.show_message,
+            plotting,
         )
 
         if message == 1:
@@ -261,10 +307,10 @@ def main():
     Main starts the programme with the GUI
     :return:
     """
-    logging.info("Starting the BioRetrieval GUI application.")
+    logging.info("Starting the PyL2BV GUI application.")
     gui = SimpleGUI()
     gui.mainloop()
-    logging.info("BioRetrieval GUI application closed.")
+    logging.info("PyL2BV GUI application closed.")
 
 
 if __name__ == "__main__":
