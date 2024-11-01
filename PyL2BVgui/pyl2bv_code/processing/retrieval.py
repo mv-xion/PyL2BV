@@ -16,25 +16,25 @@ from matplotlib import pyplot as plt
 from netCDF4 import Dataset
 from spectral.io import envi
 
-from pyl2bv_code.auxiliar.image_read import (
+from PyL2BVgui.pyl2bv_code.auxiliar.image_read import (
     read_envi,
     read_netcdf,
     show_reflectance_img,
 )
-from pyl2bv_code.auxiliar.logger_class import Logger
-from pyl2bv_code.auxiliar.spectra_interpolation import spline_interpolation
-from pyl2bv_code.processing.mlra_gpr import MLRA_GPR
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+import PyL2BVgui.pyl2bv_code.auxiliar.logger_config
+from PyL2BVgui.pyl2bv_code.auxiliar.spectra_interpolation import (
+    spline_interpolation,
 )
+from PyL2BVgui.pyl2bv_code.processing.mlra_gpr import MLRA_GPR
+
+# Retrieve the loggers by name
+app_logger = logging.getLogger("app_logger")
+image_logger = logging.getLogger("image_logger")
 
 
 class Retrieval:
     def __init__(
         self,
-        logfile: Logger,
         show_message: callable,
         input_file: str,
         input_type: str,
@@ -45,7 +45,6 @@ class Retrieval:
     ):
         """
         Initialise the retrieval class
-        :param logfile: path to the log file
         :param show_message: function for printing the message to gui
         :param input_file: path to the input file
         :param input_type: type of input file
@@ -54,6 +53,7 @@ class Retrieval:
         :param conversion_factor: image conversion factor
         :param plotting: bool to plot the results or not
         """
+        self.message = None
         self.plotting = plotting
         self.conversion_factor = conversion_factor
         self.number_of_models = None
@@ -69,7 +69,6 @@ class Retrieval:
         self.img_wavelength = None
         self.img_reflectance = None
         self.data_norm = None
-        self.logger = logfile
         self.show_message = show_message
         self.input_file = input_file
         self.input_type = input_type
@@ -78,9 +77,11 @@ class Retrieval:
 
     @property
     def bio_retrieval(self) -> bool:
-        self.logger.open()
-        logging.info("Reading image...")
-        self.show_message("Reading image...")
+        self.message = "Reading image..."
+        app_logger.info(self.message)
+        image_logger.info(self.message)
+        self.show_message(self.message)
+
         self.start = time()
         # __________________________Split image read by file type______________
 
@@ -94,22 +95,27 @@ class Retrieval:
             self.img_reflectance = image_data[0]  # save reflectance
             self.img_wavelength = image_data[1]  # save wavelength
             if len(image_data) == 4:
-                self.show_message("Map info included")
+                self.message = "Map info included"
+                app_logger.info(self.message)
+                image_logger.info(self.message)
+                self.show_message(self.message)
                 self.map_info = True
                 self.latitude = image_data[2]
                 self.longitude = image_data[3]
             else:
-                self.show_message("No map info")
+                self.message = "No map info"
+                app_logger.info(self.message)
+                image_logger.info(self.message)
+                self.show_message(self.message)
                 self.map_info = False
         self.end = time()
         self.process_time = self.end - self.start
         self.rows, self.cols, self.dims = self.img_reflectance.shape
 
-        logging.info(f"Image read. Elapsed time: {self.process_time}")
-        self.show_message(f"Image read. Elapsed time: {self.process_time}")
-        self.logger.log_message(
-            f"Image read. Elapsed time: {self.process_time}\n"
-        )
+        self.message = f"Image read. Elapsed time: {self.process_time}"
+        app_logger.info(self.message)
+        image_logger.info(self.message)
+        self.show_message(self.message)
 
         # Showing image
         if self.plotting:
@@ -125,44 +131,40 @@ class Retrieval:
                     f"No models found in path: {self.model_path}"
                 )
         except Exception as e:
-            logging.error(e)
-            self.show_message(str(e))
-            self.logger.log_message(f"{e}\n")
+            self.message = f"Error: {e}"
+            app_logger.error(self.message)
+            image_logger.error(self.message)
+            self.show_message(self.message)
             return True
         list_of_models = list(
             filter(lambda file: file.endswith(".py"), list_of_files)
         )
         self.number_of_models = len(list_of_models)
-        logging.info(
-            f"Getting model {self.number_of_models} names was successful."
-        )
-        self.show_message(
-            f"Getting model {self.number_of_models} names was successful."
-        )
-        self.logger.log_message(
-            f"Getting model {self.number_of_models} names was successful.\n"
-        )
+        self.message = f"Getting {self.number_of_models} names was successful."
+        app_logger.info(self.message)
+        image_logger.info(self.message)
+        self.show_message(self.message)
 
         # Importing the models
         sys.path.append(self.model_path)
 
         # Reading the models
-        def import_and_log_model(model_file, bio_models, show_message, logger):
+        def import_and_log_model(model_file, bio_models):
             # Importing model
             module = importlib.import_module(
                 os.path.splitext(model_file)[0], package=None
             )
             bio_models.append(module)
-            message = f"{module.model} imported"
-            logging.info(message)
-            show_message(message)
-            logger.log_message(message + "\n")
+            self.message = f"{module.model} imported"
+            app_logger.info(self.message)
+            image_logger.info(self.message)
+            self.show_message(self.message)
 
-        # Assuming self.bio_models, self.show_message, and self.logger are defined
+        # Assuming self.bio_models and self.show_message are defined
         list(
             map(
                 lambda model_file: import_and_log_model(
-                    model_file, self.bio_models, self.show_message, self.logger
+                    model_file, self.bio_models
                 ),
                 list_of_models,
             )
@@ -171,14 +173,15 @@ class Retrieval:
         # _________________________________Retrieval___________________________________________
 
         def run_model(i):
-            logging.info(f"Running {self.bio_models[i].model} model")
-            self.show_message(f"Running {self.bio_models[i].model} model")
-            self.logger.log_message(
-                f"Running {self.bio_models[i].model} model\n"
-            )
+            self.message = f"Running {self.bio_models[i].model} model"
+            app_logger.info(self.message)
+            image_logger.info(self.message)
+            self.show_message(self.message)
 
-            logging.info("Band selection...")
-            self.show_message("Band selection...")
+            self.message = "Band selection..."
+            app_logger.info(self.message)
+            image_logger.info(self.message)
+            self.show_message(self.message)
 
             # Band selection of the image
             self.start = time()
@@ -186,16 +189,19 @@ class Retrieval:
             self.end = time()
             self.process_time = self.end - self.start
 
-            logging.info(
-                f"Bands selected. Shape: {data_refl_new.shape} \nElapsed time: {self.process_time}"
-            )
-            self.show_message(
-                f"Bands selected. Shape: {data_refl_new.shape} \nElapsed time: {self.process_time}"
-            )
-            self.logger.log_message(
-                f"Image read.Bands selected. Shape: {data_refl_new.shape}"
-                f" \nElapsed time: {self.process_time}\n"
-            )
+            self.message = f"Bands selected."
+            app_logger.info(self.message)
+            image_logger.info(self.message)
+            self.show_message(self.message)
+
+            self.message = f"Elapsed time: {self.process_time}"
+            app_logger.info(self.message)
+            image_logger.info(self.message)
+            self.show_message(self.message)
+
+            self.message = f"Shape: {data_refl_new.shape}"
+            app_logger.debug(self.message)
+            image_logger.debug(self.message)
 
             # Normalising the image
             self.data_norm = norm_data(
@@ -203,13 +209,24 @@ class Retrieval:
                 self.bio_models[i].mx_GREEN,
                 self.bio_models[i].sx_GREEN,
             )
+            self.message = f"Data normalised: {self.data_norm.shape}"
+            app_logger.debug(self.message)
+            image_logger.debug(self.message)
 
             # Perform PCA if there is data
             if (
                 hasattr(self.bio_models[i], "pca_mat")
                 and len(self.bio_models[i].pca_mat) > 0
             ):
+                self.message = f"PCA found in model, performing PCA."
+                app_logger.info(self.message)
+                image_logger.info(self.message)
+                self.show_message(self.message)
+
                 self.data_norm = self.data_norm.dot(self.bio_models[i].pca_mat)
+                self.message = f"Shape: {self.data_norm.shape}"
+                app_logger.debug(self.message)
+                image_logger.debug(self.message)
 
             if self.bio_models[i].model_type == "GPR":
                 # Changing axes to because GPR function takes dim,y,x
@@ -219,12 +236,12 @@ class Retrieval:
                 self.img_array = np.transpose(self.data_norm)
 
                 # Transform model to dictionary
-                model_dict = module_to_dict(
-                    self.bio_models[i]
-                )  # we dont use it now
+                model_dict = module_to_dict(self.bio_models[i])
 
-                logging.info("Running GPR...")
-                self.show_message("Running GPR...")
+                self.message = "Running GPR..."
+                app_logger.info(self.message)
+                image_logger.info(self.message)
+                self.show_message(self.message)
 
                 gpr_object = MLRA_GPR(self.img_array, model_dict)
                 self.start = time()
@@ -235,23 +252,19 @@ class Retrieval:
 
                 # Logging
                 self.process_time = self.end - self.start
-                logging.info(f"Elapsed time of GPR: {self.process_time}")
-                self.show_message(f"Elapsed time of GPR: {self.process_time}")
-                self.logger.log_message(
-                    f"Elapsed time of GPR: {self.process_time}\n"
-                )
+                self.message = f"Elapsed time of GPR: {self.process_time}"
+                app_logger.info(self.message)
+                image_logger.info(self.message)
+                self.show_message(self.message)
+
+                # Appending results
                 self.variable_maps.append(variable_map)
                 self.uncertainty_maps.append(uncertainty_map)
 
-                logging.info(
-                    f"Retrieval of {self.bio_models[i].veg_index} was successful."
-                )
-                self.show_message(
-                    f"Retrieval of {self.bio_models[i].veg_index} was successful."
-                )
-                self.logger.log_message(
-                    f"Retrieval of {self.bio_models[i].veg_index} was successful.\n"
-                )
+                self.message = f"Retrieval of {self.bio_models[i].veg_index} was successful."
+                app_logger.info(self.message)
+                image_logger.info(self.message)
+                self.show_message(self.message)
 
         # Use ThreadPoolExecutor to run models in parallel
         with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -262,8 +275,6 @@ class Retrieval:
             for future in concurrent.futures.as_completed(futures):
                 future.result()  # This will raise any exceptions caught during execution
 
-        # _________________________________Finishing tasks_____________________
-        self.logger.close()
         return False
 
     def band_selection(self, i: int) -> np.ndarray:
@@ -274,19 +285,18 @@ class Retrieval:
             reflectances_new = self.img_reflectance[
                 :, :, np.where(np.in1d(current_wl, expected_wl))[0]
             ]
-            logging.info("Matching bands found.")
-            self.show_message("Matching bands found.")
-            self.logger.log_message("Matching bands found.\n")
+            self.message = "Matching bands found."
+            app_logger.info(self.message)
+            image_logger.info(self.message)
+            self.show_message(self.message)
         else:
-            logging.info(
+            self.message = (
                 "No matching bands found, spline interpolation is applied."
             )
-            self.show_message(
-                "No matching bands found, spline interpolation is applied."
-            )
-            self.logger.log_message(
-                "No matching bands found, spline interpolation is applied.\n"
-            )
+            app_logger.info(self.message)
+            image_logger.info(self.message)
+            self.show_message(self.message)
+
             reflectances_new = spline_interpolation(
                 current_wl, self.img_reflectance, expected_wl
             )
@@ -294,9 +304,11 @@ class Retrieval:
         return reflectances_new  # returning the selected bands
 
     def export_retrieval(self) -> bool:
-        self.logger.open()
-        logging.info("Exporting image...")
-        self.show_message("Exporting image...")
+        self.message = "Exporting image..."
+        app_logger.info(self.message)
+        image_logger.info(self.message)
+        self.show_message(self.message)
+
         self.start = time()
         # __________________________Split image export by file type______________
 
@@ -307,19 +319,17 @@ class Retrieval:
         self.end = time()
         self.process_time = self.end - self.start
 
-        logging.info(f"Image exported. Elapsed time:{self.process_time}")
-        self.show_message(f"Image exported. Elapsed time:{self.process_time}")
-        self.logger.log_message(
-            f"Image exported. Elapsed time:{self.process_time}\n"
-        )
+        self.message = f"Image exported. Elapsed time:{self.process_time}"
+        app_logger.info(self.message)
+        image_logger.info(self.message)
+        self.show_message(self.message)
 
-        logging.info(f"Show images")
-        self.show_message(f"Show images")
-        self.logger.log_message(f"Show images")
         if self.plotting:
+            self.message = f"Plotting result images"
+            app_logger.info(self.message)
+            image_logger.info(self.message)
+            self.show_message(self.message)
             self.show_results()
-
-        self.logger.close()
         return False
 
     def export_netcdf(self):
@@ -384,15 +394,12 @@ class Retrieval:
             retrieval_var[:] = np.transpose(self.variable_maps[i])
             sd_var[:] = np.transpose(self.uncertainty_maps[i])
 
-        logging.info(
+        self.message = (
             f"NetCDF file created successfully at: {self.output_file}"
         )
-        self.show_message(
-            f"NetCDF file created successfully at: {self.output_file}"
-        )
-        self.logger.log_message(
-            f"NetCDF file created successfully at: {self.output_file}\n"
-        )
+        app_logger.info(self.message)
+        image_logger.info(self.message)
+        self.show_message(self.message)
 
     def export_envi(self):
         # Open the ENVI file
@@ -454,15 +461,13 @@ class Retrieval:
             metadata=metadata,
         )
 
-        logging.info(f"ENVI file created successfully at: {self.output_file}")
-        self.show_message(
-            f"ENVI file created successfully at: {self.output_file}"
-        )
-        self.logger.log_message(
-            f"ENVI file created successfully at: {self.output_file}\n"
-        )
+        self.message = f"ENVI file created successfully at: {self.output_file}"
+        app_logger.info(self.message)
+        image_logger.info(self.message)
+        self.show_message(self.message)
 
     # TODO: maybe in a new GUI window?
+    # Only for CCC, CWC, LAI yet
     def show_results(self):
         """
         Show results and export function of retrieval

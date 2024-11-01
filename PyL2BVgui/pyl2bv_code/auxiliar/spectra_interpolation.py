@@ -7,21 +7,23 @@ import logging
 
 from scipy.interpolate import make_interp_spline
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+# Retrieve the loggers by name
+app_logger = logging.getLogger("app_logger")
+image_logger = logging.getLogger("image_logger")
 
 
 def spline_interpolation(current_wl, reflectances, expected_wl):
     try:
-        logging.info("Starting spline interpolation.")
+        app_logger.info("Starting spline interpolation.")
+        image_logger.info("Starting spline interpolation.")
         interpolator = make_interp_spline(current_wl, reflectances, axis=2)
         interpolated_datacube = interpolator(expected_wl)
-        logging.info("Spline interpolation completed successfully.")
+        app_logger.info("Spline interpolation completed successfully.")
+        image_logger.info("Spline interpolation completed successfully.")
         return interpolated_datacube
     except Exception as e:
-        logging.error(f"Error during spline interpolation: {e}")
+        app_logger.error(f"Error during spline interpolation: {e}")
+        image_logger.error(f"Error during spline interpolation: {e}")
         raise
 
 

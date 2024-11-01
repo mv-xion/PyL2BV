@@ -5,13 +5,18 @@ from multiprocessing import Pool, cpu_count
 import numpy as np
 from joblib import Parallel, delayed
 
-from pyl2bv_code.processing.mlra import MLRA_Methods
+from PyL2BVgui.pyl2bv_code.processing.mlra import MLRA_Methods
+
+# Retrieve the loggers by name
+app_logger = logging.getLogger("app_logger")
+image_logger = logging.getLogger("image_logger")
 
 
 class MLRA_GPR(MLRA_Methods):
     def __init__(self, image: np.ndarray, bio_model) -> None:
         super().__init__(image, bio_model)
-        logging.info("Initialized MLRA_GPR with image and bio_model.")
+        app_logger.info("Initialized MLRA_GPR with image and bio_model.")
+        image_logger.info("Initialized MLRA_GPR with image and bio_model.")
 
         # Load large arrays once
         self.hyp_ell_GREEN = bio_model["hyp_ell_GREEN"]
@@ -93,7 +98,9 @@ class MLRA_GPR(MLRA_Methods):
 
     def perform_mlra(self) -> tuple:
         try:
-            logging.info("Starting perform_mlra.")
+            app_logger.info("Starting perform_mlra.")
+            image_logger.info("Starting perform_mlra.")
+
             ydim, xdim = self.image.shape[1:]
             num_pixels = ydim * xdim
 
@@ -116,8 +123,10 @@ class MLRA_GPR(MLRA_Methods):
             variable_map = mean_pred.reshape(ydim, xdim)
             uncertainty_map = Variance.reshape(ydim, xdim)
 
-            logging.info("Completed perform_mlra.")
+            app_logger.info("Completed perform_mlra.")
+            image_logger.info("Completed perform_mlra.")
             return variable_map, uncertainty_map
         except Exception as e:
-            logging.error(f"Error in perform_mlra: {e}")
+            app_logger.error(f"Error in perform_mlra: {e}")
+            image_logger.error(f"Error in perform_mlra: {e}")
             raise
