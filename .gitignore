@@ -1,6 +1,7 @@
 
-PyL2BVgui/input/
-PyL2BVgui/output/
+input/
+output/
 /.idea
+/.logs
 __pycache__/
 *.txt

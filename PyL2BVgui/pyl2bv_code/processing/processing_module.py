@@ -5,17 +5,13 @@
 
 import logging
 import os
-import shutil
 from datetime import datetime
 from shutil import copyfile, rmtree
 
-from pyl2bv_code.auxiliar.logger_class import Logger
-from pyl2bv_code.processing.retrieval import Retrieval
+from PyL2BVgui.pyl2bv_code.auxiliar.logger_config import setup_logger
+from PyL2BVgui.pyl2bv_code.processing.retrieval import Retrieval
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+app_logger = logging.getLogger("app_logger")  # Retrieve the logger by name
 
 
 def pyl2bv_processing(
@@ -25,6 +21,7 @@ def pyl2bv_processing(
     conversion_factor: float,
     show_message: callable,
     plotting: bool,
+    debug_log: bool,
 ):
     """
     PyL2BV retrieval module for ARTMO based models:
@@ -35,6 +32,7 @@ def pyl2bv_processing(
     reads the indicated input_type than starts the retrieval process with the models
     specified in model_folder_path.
     Parameters:
+    :param debug_log: bool to set log level to debug mode
     :param plotting: bool to plot the results or not
     :type conversion_factor: conversion factor for the retrieval
     :param input_folder_path: path to folder containing input files
@@ -62,7 +60,7 @@ def pyl2bv_processing(
 
     if input_type == "CHIME netCDF":
         show_message("Type: " + input_type)
-        logging.info(f"Processing input type: {input_type}")
+        app_logger.info(f"Processing input type: {input_type}")
 
         # Check input files, log if number of files are not correct
         list_of_files = os.listdir(input_path)
@@ -74,7 +72,10 @@ def pyl2bv_processing(
                 make_output_folder(output_path)
                 raise FileNotFoundError("Missing input nc file.")
         except Exception as e:
-            logging.error(f"Error: {e}")
+            app_logger.error(
+                f"Error: {e}\n"
+                f"FAIL: Wrong number of inputs or error loading input image."
+            )
             show_message("Missing input nc file.")
             with open(logfile_path, "w") as fileID:
                 fileID.write(
@@ -120,7 +121,7 @@ def pyl2bv_processing(
                 l2b_output_file_qua = l2b_output_files[i].replace("IMG", "QUA")
                 copyfile(input_file_qua, l2b_output_file_qua)
             except FileNotFoundError as e:
-                logging.error(f"Error: {e}")
+                app_logger.error(f"Error: {e}")
                 show_message("Missing complementary files for CHIME image.")
                 with open(logfile_path, "w") as fileID:
                     fileID.write(
@@ -130,7 +131,7 @@ def pyl2bv_processing(
                     fileID.write(f"Input Path: {input_path} \n")
                 return 1
             except Exception as e:
-                logging.error(f"Unexpected error: {e}")
+                app_logger.error(f"Unexpected error: {e}")
                 show_message(
                     "An unexpected error occurred while copying complementary file."
                 )
@@ -144,7 +145,7 @@ def pyl2bv_processing(
 
     elif input_type == "ENVI Standard":
         show_message("Type: " + input_type)
-        logging.info(f"Processing input type: {input_type}")
+        app_logger.info(f"Processing input type: {input_type}")
 
         # Check input files, log if number of files are not correct
         list_of_files = os.listdir(input_path)
@@ -160,7 +161,10 @@ def pyl2bv_processing(
                     os.makedirs(output_path)
                 raise FileNotFoundError("Missing input hdr file.")
         except Exception as e:
-            logging.error(f"Error: {e}")
+            app_logger.error(
+                f"Error: {e}\n"
+                f"FAIL: Wrong number of inputs or error loading input file."
+            )
             show_message("Missing input hdr file.")
             with open(logfile_path, "w") as fileID:
                 fileID.write(
@@ -190,7 +194,7 @@ def pyl2bv_processing(
         # Create output folder
         flag_out = make_output_folder(output_path)
     else:
-        logging.error("Invalid input format")
+        app_logger.error("Invalid input format")
         return 1
 
     # ____________________________________Retrieval________________________________
@@ -198,34 +202,40 @@ def pyl2bv_processing(
     # Biophysical parameters retrieval
     for i in range(num_images):
         img_name = os.path.basename(l2b_output_files[i])
-        log_path = os.path.splitext(l2b_output_files[i])[0]
-        log_file_id = Logger(log_path)
+        log_path = os.path.splitext(l2b_output_files[i])[0] + "_logfile.log"
+        log_level = logging.DEBUG if debug_log else logging.INFO
+        image_logger = setup_logger(
+            logger_name="image_logger",
+            logfile_name=log_path,
+            console_log_level=log_level,
+            file_log_level=log_level,
+            total_log_level=log_level,
+            only_log_to_file=True,
+        )
         if i == 0:
             # Log information to logfile
             if flag_out:
-                logging.info(
+                app_logger.debug(
                     "Output folder already exists. Folder was overwritten."
                 )
-                log_file_id.log_message(
-                    "Output folder already exists. Folder was overwritten.\n"
+                image_logger.debug(
+                    "Output folder already exists. Folder was overwritten."
                 )
             else:
-                logging.info(
+                app_logger.debug(
                     "Output folder does not exist. Folder was created."
                 )
-                log_file_id.log_message(
-                    "Output folder does not exist. Folder was created.\n"
+                image_logger.debug(
+                    "Output folder does not exist. Folder was created."
                 )
 
         # Log image information
-        logging.info(f"Processing tile: {img_name}")
+        app_logger.info(f"Processing tile: {img_name}")
         show_message(f"Tile: {img_name}")
-        log_file_id.log_message(f"Tile: {img_name}\n")
-        log_file_id.close()
+        image_logger.info(f"Tile: {img_name}")
 
         # Creating Retrieval object and call function
         retrieval_object = Retrieval(
-            log_file_id,
             show_message,
             input_files[i],
             input_type,
@@ -237,18 +247,17 @@ def pyl2bv_processing(
 
         return_value = retrieval_object.bio_retrieval
         if return_value == 1:  # There was an error
-            logging.error(f"Error during retrieval of {img_name}")
+            app_logger.error(f"Error during retrieval of {img_name}")
             return 1
         else:
             export_value = retrieval_object.export_retrieval()
             if export_value == 1:  # There was an error
-                logging.error(f"Error during export of {img_name}")
+                app_logger.error(f"Error during export of {img_name}")
                 return 1
 
-        logging.info(f"Retrieval of {img_name} successful.")
+        app_logger.info(f"Retrieval of {img_name} successful.")
         # show_message(f"Retrieval of {img_name} successful.")
-        with open(f"{log_path}_logfile.log", "a") as log_file_id:
-            log_file_id.write(f"Retrieval of {img_name} successful.\n")
+        image_logger.info(f"Retrieval of {img_name} successful.\n")
     return 0
 
 
@@ -261,11 +270,11 @@ def make_output_folder(output_path: str) -> bool:
     if os.path.exists(output_path):
         rmtree(output_path)
         os.makedirs(output_path)
-        logging.info(
+        app_logger.debug(
             f"Output folder {output_path} already existed and was overwritten."
         )
         return True
     else:
         os.makedirs(output_path)
-        logging.info(f"Output folder {output_path} was created.")
+        app_logger.debug(f"Output folder {output_path} was created.")
         return False

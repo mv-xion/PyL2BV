@@ -5,16 +5,16 @@
 import logging
 import os
 import threading
+import time
 import webbrowser
 import tkinter as tk
 from tkinter import filedialog, ttk
 
+from datetime import datetime
+from pyl2bv_code.auxiliar.logger_config import setup_logger
 from pyl2bv_code.processing.processing_module import pyl2bv_processing
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+app_logger = logging.getLogger("app_logger")  # Retrieve the logger by name
 
 
 class SimpleGUI(tk.Tk):
@@ -23,7 +23,7 @@ class SimpleGUI(tk.Tk):
         self.title("PyL2BV for the retrieval of biophysical variables")
         self.create_widgets()
         self.create_menu()  # Initialize the menu
-        logging.info("Initialized SimpleGUI.")
+        app_logger.info("Initialized SimpleGUI.")
         self.model_thread = None
 
     def create_widgets(self):
@@ -89,7 +89,7 @@ class SimpleGUI(tk.Tk):
         )
         self.button_run.grid(row=3, column=1, padx=5, pady=5)
 
-        logging.info("Created GUI widgets.")
+        app_logger.info("Created GUI widgets.")
 
     def create_menu(self):
         # Creating menu bar
@@ -102,8 +102,10 @@ class SimpleGUI(tk.Tk):
         )  # Close the app
         self.menu_bar.add_cascade(label="File", menu=self.file_menu)
 
-        # Advanced Settings menu with the Plotting results checkbox
+        # Advanced Settings menu with the Plotting results and Debug log checkboxes
         self.advanced_menu = tk.Menu(self.menu_bar, tearoff=0)
+
+        # Plotting results checkbox
         self.plotting_results_var = tk.BooleanVar()
         self.advanced_menu.add_checkbutton(
             label="Plotting results",
@@ -111,6 +113,17 @@ class SimpleGUI(tk.Tk):
             offvalue=False,
             variable=self.plotting_results_var,
         )
+
+        # Debug log checkbox
+        self.debug_log_var = tk.BooleanVar()
+        self.advanced_menu.add_checkbutton(
+            label="Debug log",
+            onvalue=True,
+            offvalue=False,
+            variable=self.debug_log_var,
+        )
+
+        # Add Advanced Settings menu to the menu bar
         self.menu_bar.add_cascade(
             label="Advanced Settings", menu=self.advanced_menu
         )
@@ -135,7 +148,7 @@ class SimpleGUI(tk.Tk):
         if input_folder:
             self.entry_input_folder.delete(0, tk.END)
             self.entry_input_folder.insert(0, input_folder)
-            logging.info(f"Selected input folder: {input_folder}")
+            app_logger.info(f"Selected input folder: {input_folder}")
 
     def browse_model_folder(self):
         model_folder = filedialog.askdirectory(
@@ -144,7 +157,7 @@ class SimpleGUI(tk.Tk):
         if model_folder:
             self.entry_model_folder.delete(0, tk.END)
             self.entry_model_folder.insert(0, model_folder)
-            logging.info(f"Selected model folder: {model_folder}")
+            app_logger.info(f"Selected model folder: {model_folder}")
 
     def start_model_thread(self):
         """
@@ -157,16 +170,18 @@ class SimpleGUI(tk.Tk):
         input_type = self.input_type_var.get()
         conversion_factor = float(self.entry_conversion_factor.get())
         plotting = self.plotting_results_var.get()
+        debug_log = bool(self.debug_log_var.get())
         try:
             if os.path.isdir(input_folder_path) and os.path.isdir(
                 model_folder_path
             ):
-                logging.info("Starting model thread.")
-                logging.info(f"Input folder: {input_folder_path}")
-                logging.info(f"Model folder: {model_folder_path}")
-                logging.info(f"Input type: {input_type}")
-                logging.info(f"Conversion factor: {conversion_factor}")
-                logging.info(f"Plotting request: {plotting}")
+                app_logger.info("Starting model thread.")
+                app_logger.info(f"Input folder: {input_folder_path}")
+                app_logger.info(f"Model folder: {model_folder_path}")
+                app_logger.info(f"Input type: {input_type}")
+                app_logger.info(f"Conversion factor: {conversion_factor}")
+                app_logger.info(f"Plotting request: {plotting}")
+                app_logger.info(f"Debug log request: {debug_log}")
 
                 # Disable the Run button
                 self.button_run.config(state=tk.DISABLED)
@@ -195,6 +210,7 @@ class SimpleGUI(tk.Tk):
 
                 # Run the model in a separate thread
                 self.model_thread = threading.Thread(
+                    name="RetrievalThread",
                     target=self.run_model,
                     args=(
                         input_folder_path,
@@ -202,6 +218,7 @@ class SimpleGUI(tk.Tk):
                         model_folder_path,
                         conversion_factor,
                         plotting,
+                        debug_log,
                     ),
                 )
                 self.model_thread.start()
@@ -213,7 +230,7 @@ class SimpleGUI(tk.Tk):
                     "Invalid or no input or model folder selected"
                 )
         except Exception as e:
-            logging.error(
+            app_logger.error(
                 "Error occurred while starting model thread", exc_info=True
             )
             self.show_message("Error occurred while starting model thread")
@@ -231,8 +248,8 @@ class SimpleGUI(tk.Tk):
         # Enable the Run button
         self.button_run.config(state=tk.NORMAL)
 
-        # Close the progress window
-        self.progress_window.destroy()
+        # Wait 5 seconds before closing the progress window
+        self.progress_window.after(5000, self.progress_window.destroy)
 
     def run_model(
         self,
@@ -240,10 +257,12 @@ class SimpleGUI(tk.Tk):
         input_type: str,
         model_folder_path: str,
         conversion_factor: float,
-        plotting: bool,
+        plotting: bool = False,
+        debug_log: bool = False,
     ):
         """
         This function runs on the new thread and starts the retrieval function
+        :param debug_log: bool to set log level to debug mode
         :param plotting: bool to plot the results or not
         :param conversion_factor: image conversion factor
         :param input_folder_path: path to the input folder
@@ -251,7 +270,7 @@ class SimpleGUI(tk.Tk):
         :param model_folder_path: path to the model folder
         :return: Shows completion message and is able to run again
         """
-        logging.info("Running model.")
+        app_logger.info("Running model.")
 
         message = pyl2bv_processing(
             input_folder_path,
@@ -260,17 +279,20 @@ class SimpleGUI(tk.Tk):
             conversion_factor,
             self.show_message,
             plotting,
+            debug_log,
         )
 
         if message == 1:
             completion_message = "Something went wrong"
-            logging.error(completion_message)
+            self.progress_label.config(text="Something went wrong")
+            app_logger.error(completion_message)
         elif message == 0:
             completion_message = "Model ran successfully"
-            logging.info(completion_message)
+            self.progress_label.config(text="Model completed successfully!")
+            app_logger.info(completion_message)
         else:
             completion_message = "Unknown Error"
-            logging.warning(completion_message)
+            app_logger.warning(completion_message)
 
         # Schedule the display of the completion message in the main thread
         self.after(0, self.show_message, completion_message)
@@ -307,10 +329,28 @@ def main():
     Main starts the programme with the GUI
     :return:
     """
-    logging.info("Starting the PyL2BV GUI application.")
+
+    # Define the logs directory path
+    logs_dir = os.path.join(os.getcwd(), ".logs")
+
+    # Check if the directory exists, and create it if it doesn't
+    if not os.path.exists(logs_dir):
+        os.makedirs(logs_dir)
+
+    log_level = logging.DEBUG
+    logfile_name = f".logs/pyl2bv_debug_log_{datetime.now().strftime('%Y%m%d-%H%M%S')}.log"
+    app_logger = setup_logger(
+        logger_name="app_logger",
+        logfile_name=logfile_name,
+        console_log_level=log_level,
+        file_log_level=log_level,
+        total_log_level=log_level,
+    )
+
+    app_logger.info("Starting the PyL2BV GUI application.")
     gui = SimpleGUI()
     gui.mainloop()
-    logging.info("PyL2BV GUI application closed.")
+    app_logger.info("PyL2BV GUI application closed.")
 
 
 if __name__ == "__main__":
