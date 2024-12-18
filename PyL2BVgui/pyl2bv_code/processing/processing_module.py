@@ -5,10 +5,11 @@
 
 import logging
 import os
+from time import time
 from datetime import datetime
 from shutil import copyfile, rmtree
 
-from PyL2BVgui.pyl2bv_code.auxiliar.logger_config import setup_logger
+from PyL2BVgui.pyl2bv_code.auxiliar.logger_config import setup_logger, close_logger
 from PyL2BVgui.pyl2bv_code.processing.retrieval import Retrieval
 
 app_logger = logging.getLogger("app_logger")  # Retrieve the logger by name
@@ -198,7 +199,7 @@ def pyl2bv_processing(
         return 1
 
     # ____________________________________Retrieval________________________________
-
+    start = time()
     # Biophysical parameters retrieval
     for i in range(num_images):
         img_name = os.path.basename(l2b_output_files[i])
@@ -256,8 +257,14 @@ def pyl2bv_processing(
                 return 1
 
         app_logger.info(f"Retrieval of {img_name} successful.")
-        # show_message(f"Retrieval of {img_name} successful.")
+        show_message(f"Retrieval of {img_name} successful.")
         image_logger.info(f"Retrieval of {img_name} successful.\n")
+        close_logger("image_logger")
+
+    end = time()
+    process_time = end - start
+
+    app_logger.info(f"Total retrieval. Elapsed time: {process_time}")
     return 0
 
 
