@@ -10,12 +10,12 @@ import logging.config
 
 
 def setup_logger(
-    logger_name: str,
-    logfile_name: str = "debug_log.log",
-    console_log_level: int = logging.ERROR,
-    file_log_level: int = logging.DEBUG,
-    total_log_level: int = logging.DEBUG,
-    only_log_to_file: bool = False,
+        logger_name: str,
+        logfile_name: str = "debug_log.log",
+        console_log_level: int = logging.ERROR,
+        file_log_level: int = logging.DEBUG,
+        total_log_level: int = logging.DEBUG,
+        only_log_to_file: bool = False,
 ) -> logging.Logger:
     """
     Sets up and returns a logger with the specified name and configuration.
@@ -63,3 +63,10 @@ def setup_logger(
 
     logging.config.dictConfig(logging_config)
     return logging.getLogger(logger_name)
+
+
+def close_logger(logger_name: str):
+    logger = logging.getLogger(logger_name)
+    for handler in logger.handlers:
+        handler.close()
+        logger.removeHandler(handler)
