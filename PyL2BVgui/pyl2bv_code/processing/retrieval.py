@@ -125,18 +125,14 @@ class Retrieval:
         try:
             list_of_files = os.listdir(self.model_path)
             if not list_of_files:
-                raise FileNotFoundError(
-                    f"No models found in path: {self.model_path}"
-                )
+                raise FileNotFoundError(f"No models found in path: {self.model_path}")
         except Exception as e:
             message = f"Error: {e}"
             app_logger.error(message)
             image_logger.error(message)
             self.show_message(message)
             return True
-        list_of_models = list(
-            filter(lambda file: file.endswith(".py"), list_of_files)
-        )
+        list_of_models = list(filter(lambda file: file.endswith(".py"), list_of_files))
         self.number_of_models = len(list_of_models)
         message = f"Getting {self.number_of_models} names was successful."
         app_logger.info(message)
@@ -161,9 +157,7 @@ class Retrieval:
         # Assuming self.bio_models and self.show_message are defined
         list(
             map(
-                lambda model_file: import_and_log_model(
-                    model_file, self.bio_models
-                ),
+                lambda model_file: import_and_log_model(model_file, self.bio_models),
                 list_of_models,
             )
         )
@@ -267,8 +261,7 @@ class Retrieval:
         # Use ThreadPoolExecutor to run models in parallel
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = [
-                executor.submit(run_model, i)
-                for i in range(self.number_of_models)
+                executor.submit(run_model, i) for i in range(self.number_of_models)
             ]
             for future in concurrent.futures.as_completed(futures):
                 try:
@@ -292,9 +285,7 @@ class Retrieval:
             image_logger.info(message)
             self.show_message(message)
         else:
-            message = (
-                "No matching bands found, spline interpolation is applied."
-            )
+            message = "No matching bands found, spline interpolation is applied."
             app_logger.info(message)
             image_logger.info(message)
             self.show_message(message)
@@ -399,9 +390,7 @@ class Retrieval:
         finally:
             nc_file.close()  # Closing the file
 
-        message = (
-            f"NetCDF file created successfully at: {self.output_file}"
-        )
+        message = f"NetCDF file created successfully at: {self.output_file}"
         app_logger.info(message)
         image_logger.info(message)
         self.show_message(message)
@@ -477,7 +466,7 @@ class Retrieval:
         """
         Show results and export function of retrieval
         :return: plot images, save in files
-        !! Only for CCC,CWC, LAI for now !!
+        !! Colors only for CCC,CWC, LAI for now !!
         """
         # Create directories for images
         img_dir = os.path.join(os.path.dirname(self.output_file), "images")
@@ -490,71 +479,93 @@ class Retrieval:
         if not os.path.exists(vec_dir):
             os.makedirs(vec_dir)
 
+        # Define vegetation indices and their dimensions
+        veg_index_to_dimension = {
+            "LAI": "(m$^2$/m$^2$)",
+            "FAPAR": "([-])",
+            "FVC": "([-])",
+            "CCC": "(g/m$^2$)",
+            "CWC": "(g/m$^2$)",
+            "CNC": "(g/m$^2$)",
+        }
+        # Define vegetation indices and their associated colormaps
+        veg_index_to_colormap = {
+            "LAI": "YlGn",
+            "CCC": "Greens",
+            "CWC": "Blues",  # TODO: Need more colors
+        }
+
+        def plot_and_save(
+            data,
+            veg_index,
+            colormap,
+            dimension,
+            output_file,
+            img_dir,
+            vec_dir,
+            suffix="",
+        ):
+            """
+            Generalized function to plot, save, and display images.
+
+            Parameters:
+                data: The data to be plotted (e.g., variable or uncertainty map).
+                veg_index: The vegetation index (e.g., "LAI", "CCC").
+                colormap: The colormap to use for plotting.
+                dimension: The dimension to display in the title.
+                output_file: The base file name for saving images.
+                img_dir: Directory to save PNG images.
+                vec_dir: Directory to save PDF images.
+                suffix: Optional suffix for filenames (e.g., "_uncertainty").
+            """
+            # Plot the data
+            plt.imshow(data, cmap=colormap)
+            plt.title(
+                f"{'Uncertainty of ' if suffix else 'Estimated '}{veg_index} map {dimension}"
+            )
+            plt.colorbar()
+            plt.tight_layout()
+
+            # Save the image in PNG and PDF formats
+            base_name = os.path.basename(output_file)
+            plt.savefig(
+                os.path.join(img_dir, f"{base_name}{veg_index}{suffix}.png"),
+                bbox_inches="tight",
+            )
+            plt.savefig(
+                os.path.join(vec_dir, f"{base_name}{veg_index}{suffix}.pdf"),
+                bbox_inches="tight",
+            )
+            plt.show()
+
+        # Loop through models
         for i in range(self.number_of_models):
-            if self.bio_models[i].veg_index == "CCC":
-                colormap = "Greens"
-            elif self.bio_models[i].veg_index == "CWC":
-                colormap = "Blues"
-            elif self.bio_models[i].veg_index == "LAI":
-                colormap = "YlGn"
-            else:
-                colormap = "viridis"
+            veg_index = self.bio_models[i].veg_index
+            colormap = veg_index_to_colormap.get(veg_index, "viridis")
+            dimension = veg_index_to_dimension.get(veg_index, "(unknown dimension)")
 
-            # Showing the result image
-            plt.imshow(self.variable_maps[i], cmap=colormap)
-            if self.bio_models[i].veg_index == "LAI":
-                plt.title(
-                    f"Estimated {self.bio_models[i].veg_index} map (m$^2$/m$^2$)"
-                )
-            else:
-                plt.title(
-                    f"Estimated {self.bio_models[i].veg_index} map (g/m$^2$)"
-                )
-            plt.colorbar()
-            plt.tight_layout()
-            plt.savefig(
-                os.path.join(
-                    img_dir,
-                    f"{os.path.basename(self.output_file)}{self.bio_models[i].veg_index}.png",
-                ),
-                bbox_inches="tight",
+            # Plot and save variable map
+            plot_and_save(
+                data=self.variable_maps[i],
+                veg_index=veg_index,
+                colormap=colormap,
+                dimension=dimension,
+                output_file=self.output_file,
+                img_dir=img_dir,
+                vec_dir=vec_dir,
             )
-            plt.savefig(
-                os.path.join(
-                    vec_dir,
-                    f"{os.path.basename(self.output_file)}{self.bio_models[i].veg_index}.pdf",
-                ),
-                bbox_inches="tight",
-            )
-            plt.show()
 
-            # Showing the uncertainty image
-            plt.imshow(self.uncertainty_maps[i], cmap="jet")
-            if self.bio_models[i].veg_index == "LAI":
-                plt.title(
-                    f"Uncertainty of {self.bio_models[i].veg_index} map (m$^2$/m$^2$)"
-                )
-            else:
-                plt.title(
-                    f"Uncertainty of {self.bio_models[i].veg_index} map (g/m$^2$)"
-                )
-            plt.colorbar()
-            plt.tight_layout()
-            plt.savefig(
-                os.path.join(
-                    img_dir,
-                    f"{os.path.basename(self.output_file)}{self.bio_models[i].veg_index}_uncertainty.png",
-                ),
-                bbox_inches="tight",
+            # Plot and save uncertainty map
+            plot_and_save(
+                data=self.uncertainty_maps[i],
+                veg_index=veg_index,
+                colormap="jet",
+                dimension=dimension,
+                output_file=self.output_file,
+                img_dir=img_dir,
+                vec_dir=vec_dir,
+                suffix="_uncertainty",
             )
-            plt.savefig(
-                os.path.join(
-                    vec_dir,
-                    f"{os.path.basename(self.output_file)}{self.bio_models[i].veg_index}_uncertainty.pdf",
-                ),
-                bbox_inches="tight",
-            )
-            plt.show()
 
 
 # Normalise data function
@@ -573,9 +584,7 @@ def module_to_dict(bio_model) -> dict:
     # Convert the module's attributes to a dictionary, excluding special
     # methods/attributes
     module_dict = {
-        key: value
-        for key, value in vars(bio_model).items()
-        if not key.startswith("__")
+        key: value for key, value in vars(bio_model).items() if not key.startswith("__")
     }
 
     module_dict = {k: v for k, v in module_dict.items() if is_picklable(v)}
