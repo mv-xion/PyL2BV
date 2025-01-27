@@ -491,6 +491,8 @@ class Retrieval:
         # Define vegetation indices and their associated colormaps
         veg_index_to_colormap = {
             "LAI": "YlGn",
+            "FAPAR": "Reds",
+            "FVC": "Oranges",
             "CCC": "Greens",
             "CWC": "Blues",  # TODO: Need more colors
         }
