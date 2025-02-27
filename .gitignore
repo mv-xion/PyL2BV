@@ -1,6 +1,5 @@
-PyL2BVgui/.logs/
-input/
-output/
+PyL2BVgui/input/
+PyL2BVgui/output/
 /.idea
 /.logs
 __pycache__/
