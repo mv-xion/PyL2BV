@@ -199,36 +199,25 @@ def pyl2bv_processing(
         return 1
 
     # ____________________________________Retrieval________________________________
-    start = time()
     # Biophysical parameters retrieval
     for i in range(num_images):
+        start = time()
         img_name = os.path.basename(l2b_output_files[i])
         log_path = os.path.splitext(l2b_output_files[i])[0] + "_logfile.log"
         log_level = logging.DEBUG if debug_log else logging.INFO
         image_logger = setup_logger(
             logger_name="image_logger",
             logfile_name=log_path,
-            console_log_level=log_level,
-            file_log_level=log_level,
-            total_log_level=log_level,
-            only_log_to_file=True,
+            log_level=log_level,
         )
         if i == 0:
             # Log information to logfile
             if flag_out:
-                app_logger.debug(
-                    "Output folder already exists. Folder was overwritten."
-                )
                 image_logger.debug(
                     "Output folder already exists. Folder was overwritten."
                 )
             else:
-                app_logger.debug(
-                    "Output folder does not exist. Folder was created."
-                )
-                image_logger.debug(
-                    "Output folder does not exist. Folder was created."
-                )
+                image_logger.debug("Output folder does not exist. Folder was created.")
 
         # Log image information
         app_logger.info(f"Processing tile: {img_name}")
@@ -248,23 +237,21 @@ def pyl2bv_processing(
 
         return_value = retrieval_object.bio_retrieval
         if return_value == 1:  # There was an error
-            app_logger.error(f"Error during retrieval of {img_name}")
+            image_logger.error(f"Error during retrieval of {img_name}")
             return 1
         else:
             export_value = retrieval_object.export_retrieval()
             if export_value == 1:  # There was an error
-                app_logger.error(f"Error during export of {img_name}")
+                image_logger.error(f"Error during export of {img_name}")
                 return 1
 
-        app_logger.info(f"Retrieval of {img_name} successful.")
-        show_message(f"Retrieval of {img_name} successful.")
+        end = time()
+        process_time = end - start
+
+        image_logger.info(f"Total retrieval. Elapsed time: {process_time}")
         image_logger.info(f"Retrieval of {img_name} successful.\n")
         close_logger("image_logger")
 
-    end = time()
-    process_time = end - start
-
-    app_logger.info(f"Total retrieval. Elapsed time: {process_time}")
     return 0
 
 

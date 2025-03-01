@@ -8,14 +8,12 @@ from joblib import Parallel, delayed
 from PyL2BVgui.pyl2bv_code.processing.mlra import MLRA_Methods
 
 # Retrieve the loggers by name
-app_logger = logging.getLogger("app_logger")
 image_logger = logging.getLogger("image_logger")
 
 
 class MLRA_GPR(MLRA_Methods):
     def __init__(self, image: np.ndarray, bio_model) -> None:
         super().__init__(image, bio_model)
-        app_logger.info("Initialized MLRA_GPR with image and bio_model.")
         image_logger.info("Initialized MLRA_GPR with image and bio_model.")
 
         # Load large arrays once
@@ -24,9 +22,7 @@ class MLRA_GPR(MLRA_Methods):
         self.mean_model_GREEN = bio_model["mean_model_GREEN"]
         self.hyp_sig_GREEN = bio_model["hyp_sig_GREEN"]
         self.XDX_pre_calc_GREEN = bio_model["XDX_pre_calc_GREEN"].flatten()
-        self.alpha_coefficients_GREEN = bio_model[
-            "alpha_coefficients_GREEN"
-        ].flatten()
+        self.alpha_coefficients_GREEN = bio_model["alpha_coefficients_GREEN"].flatten()
         self.Linv_pre_calc_GREEN = bio_model["Linv_pre_calc_GREEN"]
         self.hyp_sig_unc_GREEN = bio_model["hyp_sig_unc_GREEN"]
 
@@ -47,15 +43,12 @@ class MLRA_GPR(MLRA_Methods):
 
         k_star_uncert = k_star * arg1[:, np.newaxis]
         Vvector = self.Linv_pre_calc_GREEN @ k_star_uncert.T
-        Variance = np.sqrt(
-            np.abs(self.hyp_sig_unc_GREEN - np.sum(Vvector**2, axis=0))
-        )
+        Variance = np.sqrt(np.abs(self.hyp_sig_unc_GREEN - np.sum(Vvector**2, axis=0)))
 
         return mean_pred, Variance
 
     def perform_mlra(self) -> tuple:
         try:
-            app_logger.info("Starting perform_mlra.")
             image_logger.info("Starting perform_mlra.")
 
             ydim, xdim = self.image.shape[1:]
@@ -70,8 +63,7 @@ class MLRA_GPR(MLRA_Methods):
 
             # Parallelize pixel batch processing
             results = Parallel(n_jobs=num_cores)(
-                delayed(self.process_pixel_batch)(batch)
-                for batch in pixel_batches
+                delayed(self.process_pixel_batch)(batch) for batch in pixel_batches
             )
 
             mean_pred = np.concatenate([res[0] for res in results])
@@ -80,10 +72,8 @@ class MLRA_GPR(MLRA_Methods):
             variable_map = mean_pred.reshape(ydim, xdim)
             uncertainty_map = Variance.reshape(ydim, xdim)
 
-            app_logger.info("Completed perform_mlra.")
             image_logger.info("Completed perform_mlra.")
             return variable_map, uncertainty_map
         except Exception as e:
-            app_logger.error(f"Error in perform_mlra: {e}")
             image_logger.error(f"Error in perform_mlra: {e}")
             raise
