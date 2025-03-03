@@ -15,7 +15,6 @@ from pyproj import Proj
 from spectral.io.envi import open
 
 # Retrieve the loggers by name
-app_logger = logging.getLogger("app_logger")
 image_logger = logging.getLogger("image_logger")
 
 
@@ -43,7 +42,6 @@ def read_netcdf(path, conversion_factor):
 
         return data_refl, data_wavelength
     except Exception as e:
-        app_logger.error(f"Error reading netCDF file: {e}")
         image_logger.error(f"Error reading netCDF file: {e}")
         raise
 
@@ -61,11 +59,12 @@ def read_envi(path: str, conversion_factor: float) -> tuple:
     """
     try:
         # Open the ENVI file
-        envi_image = open(path,
+        envi_image = open(
+            path,
             os.path.join(
                 os.path.dirname(path),
                 os.path.splitext(os.path.basename(path))[0],
-            )
+            ),
         )
 
         # Load the data into a NumPy array
@@ -94,7 +93,6 @@ def read_envi(path: str, conversion_factor: float) -> tuple:
         else:
             return data, data_wavelength
     except Exception as e:
-        app_logger.error(f"Error reading ENVI file: {e}")
         image_logger.error(f"Error reading ENVI file: {e}")
         raise
 
@@ -129,9 +127,7 @@ def get_lat_lon_envi(map_info: dict, lon: list, lat: list) -> tuple:
         utm_zone = int(map_info[7])
         utm_hemisphere = map_info[8]  # Assuming the hemisphere is North
         datum = map_info[9].replace("-", "")
-        utm_proj_string = (
-            f"+proj=utm +zone={utm_zone} +{utm_hemisphere} +datum={datum}"
-        )
+        utm_proj_string = f"+proj=utm +zone={utm_zone} +{utm_hemisphere} +datum={datum}"
 
         # Create a pyproj projection object
         utm_proj = Proj(utm_proj_string)
@@ -151,7 +147,6 @@ def get_lat_lon_envi(map_info: dict, lon: list, lat: list) -> tuple:
 
         return longitude, latitude  # x,y
     except Exception as e:
-        app_logger.error(f"Error getting latitude and longitude: {e}")
         image_logger.error(f"Error getting latitude and longitude: {e}")
         raise
 
@@ -166,7 +161,6 @@ def show_reflectance_img(data_refl: np.ndarray, data_wavelength: np.ndarray):
     :param data_wavelength: list of wavelengths
     :return: no return value just plotting the image
     """
-    app_logger.info("Plotting the input image")
     image_logger.info("Plotting the input image")
     # Defining wavelength RGB
     values_to_find = np.array([639, 547, 463])

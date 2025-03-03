@@ -10,23 +10,20 @@ import logging.config
 
 
 def setup_logger(
-        logger_name: str,
-        logfile_name: str = "debug_log.log",
-        console_log_level: int = logging.ERROR,
-        file_log_level: int = logging.DEBUG,
-        total_log_level: int = logging.DEBUG,
-        only_log_to_file: bool = False,
+    logger_name: str,
+    logfile_name: str = "debug_log.log",
+    log_level: int = logging.DEBUG,
+    only_log_to_console: bool = False,
 ) -> logging.Logger:
     """
     Sets up and returns a logger with the specified name and configuration.
     :param logger_name: Name of the logger to configure.
     :param logfile_name: Name of the log file.
-    :param console_log_level: Log level for console output.
-    :param file_log_level: Log level for file output.
-    :param total_log_level: Overall log level for the logger.
-    :param only_log_to_file: Only log to file.
+    :param log_level: Overall log level for the logger.
+    :param only_log_to_console: Only log to console.
     :return: Configured logger.
     """
+    # Base logging configuration
     logging_config = {
         "version": 1,
         "disable_existing_loggers": False,
@@ -37,36 +34,43 @@ def setup_logger(
         },
         "handlers": {
             "console": {
-                "level": console_log_level,
+                "level": log_level,
                 "class": "logging.StreamHandler",
                 "formatter": "standard",
-            },
-            "file": {
-                "level": file_log_level,
-                "class": "logging.handlers.RotatingFileHandler",
-                "filename": logfile_name,
-                "formatter": "standard",
-                "maxBytes": 10485760,  # 10 MB
-                "backupCount": 5,
             },
         },
         "loggers": {
             logger_name: {
-                "handlers": (
-                    ["console", "file"] if not only_log_to_file else ["file"]
-                ),
-                "level": total_log_level,
+                "handlers": ["console"],
+                "level": log_level,
                 "propagate": False,
             }
         },
     }
 
+    # Add file handler only if not `only_log_to_console`
+    if not only_log_to_console:
+        logging_config["handlers"]["file"] = {
+            "level": log_level,
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": logfile_name,
+            "formatter": "standard",
+            "maxBytes": 10485760,  # 10 MB
+            "backupCount": 5,
+        }
+        logging_config["loggers"][logger_name]["handlers"].append("file")
+
+    # Apply the logging configuration
     logging.config.dictConfig(logging_config)
     return logging.getLogger(logger_name)
 
 
 def close_logger(logger_name: str):
     logger = logging.getLogger(logger_name)
-    for handler in logger.handlers:
+
+    for handler in logger.handlers[:]:  # Copy the list to avoid modification issues
+        handler.flush()
         handler.close()
         logger.removeHandler(handler)
+
+    logging.shutdown()  # Ensure all logging resources are freed

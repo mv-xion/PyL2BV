@@ -5,6 +5,7 @@
 
 import concurrent.futures
 import importlib
+import threading
 import logging
 import os
 import pickle
@@ -28,7 +29,6 @@ from PyL2BVgui.pyl2bv_code.auxiliar.spectra_interpolation import (
 from PyL2BVgui.pyl2bv_code.processing.mlra_gpr import MLRA_GPR
 
 # Retrieve the loggers by name
-app_logger = logging.getLogger("app_logger")
 image_logger = logging.getLogger("image_logger")
 
 
@@ -59,9 +59,8 @@ class Retrieval:
         self.bio_models = []  # Storing the models
         self.variable_maps = []  # Storing variable maps
         self.uncertainty_maps = []  # Storing uncertainty maps
-        self.start = None
-        self.end = None
-        self.process_time = None
+        self.model_order = []  # Storing the order the models ran
+        self.lock = threading.Lock()
         self.map_info = None
         self.longitude = None
         self.latitude = None
@@ -76,11 +75,10 @@ class Retrieval:
     @property
     def bio_retrieval(self) -> bool:
         message = "Reading image..."
-        app_logger.info(message)
         image_logger.info(message)
         self.show_message(message)
 
-        self.start = time()
+        start = time()
         # __________________________Split image read by file type______________
 
         if self.input_type == "CHIME netCDF":
@@ -94,7 +92,6 @@ class Retrieval:
             self.img_wavelength = image_data[1]  # save wavelength
             if len(image_data) == 4:
                 message = "Map info included"
-                app_logger.info(message)
                 image_logger.info(message)
                 self.show_message(message)
                 self.map_info = True
@@ -102,16 +99,14 @@ class Retrieval:
                 self.longitude = image_data[3]
             else:
                 message = "No map info"
-                app_logger.info(message)
                 image_logger.info(message)
                 self.show_message(message)
                 self.map_info = False
-        self.end = time()
-        self.process_time = self.end - self.start
+        end = time()
+        process_time = end - start
         self.rows, self.cols, self.dims = self.img_reflectance.shape
 
-        message = f"Image read. Elapsed time: {self.process_time}"
-        app_logger.info(message)
+        message = f"Image read. Elapsed time: {process_time}"
         image_logger.info(message)
         self.show_message(message)
 
@@ -128,14 +123,12 @@ class Retrieval:
                 raise FileNotFoundError(f"No models found in path: {self.model_path}")
         except Exception as e:
             message = f"Error: {e}"
-            app_logger.error(message)
             image_logger.error(message)
             self.show_message(message)
             return True
         list_of_models = list(filter(lambda file: file.endswith(".py"), list_of_files))
         self.number_of_models = len(list_of_models)
         message = f"Getting {self.number_of_models} names was successful."
-        app_logger.info(message)
         image_logger.info(message)
         self.show_message(message)
 
@@ -150,7 +143,6 @@ class Retrieval:
             )
             bio_models.append(module)
             message = f"{module.model} imported"
-            app_logger.info(message)
             image_logger.info(message)
             self.show_message(message)
 
@@ -166,33 +158,28 @@ class Retrieval:
 
         def run_model(i):
             message = f"Running {self.bio_models[i].model} model"
-            app_logger.info(message)
             image_logger.info(message)
             self.show_message(message)
 
             message = "Band selection..."
-            app_logger.info(message)
             image_logger.info(message)
             self.show_message(message)
 
             # Band selection of the image
-            self.start = time()
+            start = time()
             data_refl_new = self.band_selection(i)
-            self.end = time()
-            self.process_time = self.end - self.start
+            end = time()
+            process_time = end - start
 
             message = f"Bands selected."
-            app_logger.info(message)
             image_logger.info(message)
             self.show_message(message)
 
-            message = f"Elapsed time: {self.process_time}"
-            app_logger.info(message)
+            message = f"Elapsed time: {process_time}"
             image_logger.info(message)
             self.show_message(message)
 
             message = f"Shape: {data_refl_new.shape}"
-            app_logger.debug(message)
             image_logger.debug(message)
 
             # Normalising the image
@@ -202,7 +189,6 @@ class Retrieval:
                 self.bio_models[i].sx_GREEN,
             )
             message = f"Data normalised: {data_norm.shape}"
-            app_logger.debug(message)
             image_logger.debug(message)
 
             # Perform PCA if there is data
@@ -211,13 +197,11 @@ class Retrieval:
                 and len(self.bio_models[i].pca_mat) > 0
             ):
                 message = f"PCA found in model, performing PCA."
-                app_logger.info(message)
                 image_logger.info(message)
                 self.show_message(message)
 
                 data_norm = data_norm.dot(self.bio_models[i].pca_mat)
                 message = f"Shape: {data_norm.shape}"
-                app_logger.debug(message)
                 image_logger.debug(message)
 
             if self.bio_models[i].model_type == "GPR":
@@ -225,36 +209,35 @@ class Retrieval:
                 data_norm = np.swapaxes(
                     data_norm, 0, 1
                 )  # swapping axes to have the right order after transpose
-                self.img_array = np.transpose(data_norm)
+                img_array = np.transpose(data_norm)
 
                 # Transform model to dictionary
                 model_dict = module_to_dict(self.bio_models[i])
 
                 message = "Running GPR..."
-                app_logger.info(message)
                 image_logger.info(message)
                 self.show_message(message)
 
-                gpr_object = MLRA_GPR(self.img_array, model_dict)
-                self.start = time()
+                gpr_object = MLRA_GPR(img_array, model_dict)
+                start = time()
 
                 # Starting GPR
                 variable_map, uncertainty_map = gpr_object.perform_mlra()
-                self.end = time()
+                end = time()
 
                 # Logging
-                self.process_time = self.end - self.start
-                message = f"Elapsed time of GPR: {self.process_time}"
-                app_logger.info(message)
+                process_time = end - start
+                message = f"Elapsed time of GPR: {process_time}"
                 image_logger.info(message)
                 self.show_message(message)
 
                 # Appending results
-                self.variable_maps.append(variable_map)
-                self.uncertainty_maps.append(uncertainty_map)
+                with self.lock:
+                    self.variable_maps.append(variable_map)
+                    self.uncertainty_maps.append(uncertainty_map)
+                    self.model_order.append(self.bio_models[i].veg_index)
 
                 message = f"Retrieval of {self.bio_models[i].veg_index} was successful."
-                app_logger.info(message)
                 image_logger.info(message)
                 self.show_message(message)
 
@@ -267,7 +250,7 @@ class Retrieval:
                 try:
                     future.result()  # This will raise any exceptions caught during execution
                 except Exception as e:
-                    app_logger.error(f"Error in model: {e}")
+                    image_logger.error(f"Error in model: {e}")
                     raise
 
         return False
@@ -281,12 +264,10 @@ class Retrieval:
                 :, :, np.where(np.in1d(current_wl, expected_wl))[0]
             ]
             message = "Matching bands found."
-            app_logger.info(message)
             image_logger.info(message)
             self.show_message(message)
         else:
             message = "No matching bands found, spline interpolation is applied."
-            app_logger.info(message)
             image_logger.info(message)
             self.show_message(message)
 
@@ -298,28 +279,25 @@ class Retrieval:
 
     def export_retrieval(self) -> bool:
         message = "Exporting image..."
-        app_logger.info(message)
         image_logger.info(message)
         self.show_message(message)
 
-        self.start = time()
+        start = time()
         # __________________________Split image export by file type______________
 
         if self.input_type == "CHIME netCDF":
             self.export_netcdf()
         elif self.input_type == "ENVI Standard":
             self.export_envi()
-        self.end = time()
-        self.process_time = self.end - self.start
+        end = time()
+        process_time = end - start
 
-        message = f"Image exported. Elapsed time:{self.process_time}"
-        app_logger.info(message)
+        message = f"Image exported. Elapsed time:{process_time}"
         image_logger.info(message)
         self.show_message(message)
 
         if self.plotting:
             message = f"Plotting result images"
-            app_logger.info(message)
             image_logger.info(message)
             self.show_message(message)
             self.show_results()
@@ -341,28 +319,28 @@ class Retrieval:
 
             # Create groups
             for i in range(self.number_of_models):
-                group = nc_file.createGroup(self.bio_models[i].veg_index)
-                if self.bio_models[i].veg_index == "LCC":
+                group = nc_file.createGroup(self.model_order[i])
+                if self.model_order[i] == "LCC":
                     group.long_name = "Leaf Chlorophyll Content (LCC)"
-                elif self.bio_models[i].veg_index == "LWC":
+                elif self.model_order[i] == "LWC":
                     group.long_name = "Leaf Water Content (LWC)"
-                elif self.bio_models[i].veg_index == "LNC":
+                elif self.model_order[i] == "LNC":
                     group.long_name = "Leaf Nitrogen Content (LNC)"
-                elif self.bio_models[i].veg_index == "LMA":
+                elif self.model_order[i] == "LMA":
                     group.long_name = "Leaf Mass Area (LMA)"
-                elif self.bio_models[i].veg_index == "LAI":
+                elif self.model_order[i] == "LAI":
                     group.long_name = "Leaf Area Index (LAI)"
-                elif self.bio_models[i].veg_index == "CCC":
+                elif self.model_order[i] == "CCC":
                     group.long_name = "Canopy Chlorophyll Content (CCC)"
-                elif self.bio_models[i].veg_index == "CWC":
+                elif self.model_order[i] == "CWC":
                     group.long_name = "Canopy Water Content (CWC)"
-                elif self.bio_models[i].veg_index == "CDMC":
+                elif self.model_order[i] == "CDMC":
                     group.long_name = "Canopy Dry Matter Content (CDMC)"
-                elif self.bio_models[i].veg_index == "CNC":
+                elif self.model_order[i] == "CNC":
                     group.long_name = "Canopy Nitrogen Content (CNC)"
-                elif self.bio_models[i].veg_index == "FVC":
+                elif self.model_order[i] == "FVC":
                     group.long_name = "Fractional Vegetation Cover (FVC)"
-                elif self.bio_models[i].veg_index == "FAPAR":
+                elif self.model_order[i] == "FAPAR":
                     group.long_name = "Fraction of Absorbed Photosynthetically Active Radiation (FAPAR)"
 
                 # Create dimensions for group
@@ -391,7 +369,6 @@ class Retrieval:
             nc_file.close()  # Closing the file
 
         message = f"NetCDF file created successfully at: {self.output_file}"
-        app_logger.info(message)
         image_logger.info(message)
         self.show_message(message)
 
@@ -410,8 +387,8 @@ class Retrieval:
         # Construct band names
         band_names = []
         for i in range(self.number_of_models):
-            band_names.append(self.bio_models[i].veg_index)
-            band_names.append(f"{self.bio_models[i].veg_index}_sd")
+            band_names.append(self.model_order[i])
+            band_names.append(f"{self.model_order[i]}_sd")
 
         # Define metadata ENVI Standard
         metadata = {
@@ -456,12 +433,11 @@ class Retrieval:
         )
 
         message = f"ENVI file created successfully at: {self.output_file}"
-        app_logger.info(message)
         image_logger.info(message)
         self.show_message(message)
 
     # TODO: maybe in a new GUI window?
-    # Only for CCC, CWC, LAI yet
+    # Only for CCC, CWC, LAI, FAPAR, FVC yet
     def show_results(self):
         """
         Show results and export function of retrieval
@@ -491,6 +467,8 @@ class Retrieval:
         # Define vegetation indices and their associated colormaps
         veg_index_to_colormap = {
             "LAI": "YlGn",
+            "FAPAR": "Reds",
+            "FVC": "Oranges",
             "CCC": "Greens",
             "CWC": "Blues",  # TODO: Need more colors
         }
@@ -540,7 +518,7 @@ class Retrieval:
 
         # Loop through models
         for i in range(self.number_of_models):
-            veg_index = self.bio_models[i].veg_index
+            veg_index = self.model_order[i]
             colormap = veg_index_to_colormap.get(veg_index, "viridis")
             dimension = veg_index_to_dimension.get(veg_index, "(unknown dimension)")
 

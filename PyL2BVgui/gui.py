@@ -330,21 +330,11 @@ def main():
     :return:
     """
 
-    # Define the logs directory path
-    logs_dir = os.path.join(os.getcwd(), ".logs")
-
-    # Check if the directory exists, and create it if it doesn't
-    if not os.path.exists(logs_dir):
-        os.makedirs(logs_dir)
-
-    log_level = logging.DEBUG
-    logfile_name = f".logs/pyl2bv_debug_log_{datetime.now().strftime('%Y%m%d-%H%M%S')}.log"
+    log_level = logging.INFO
     app_logger = setup_logger(
         logger_name="app_logger",
-        logfile_name=logfile_name,
-        console_log_level=log_level,
-        file_log_level=log_level,
-        total_log_level=log_level,
+        log_level=log_level,
+        only_log_to_console=True
     )
 
     app_logger.info("Starting the PyL2BV GUI application.")
