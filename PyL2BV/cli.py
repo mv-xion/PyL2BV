@@ -1,5 +1,5 @@
 import argparse
-from pyl2bv_code.model_runner import run_retrieval
+from .pyl2bv_code.model_runner import run_retrieval
 
 
 def main():

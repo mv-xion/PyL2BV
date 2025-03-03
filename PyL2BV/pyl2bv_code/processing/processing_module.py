@@ -245,11 +245,13 @@ def pyl2bv_processing(
         return_value = retrieval_object.bio_retrieval
         if return_value == 1:  # There was an error
             image_logger.error(f"Error during retrieval of {img_name}")
+            close_logger("image_logger")
             return 1
         else:
             export_value = retrieval_object.export_retrieval()
             if export_value == 1:  # There was an error
                 image_logger.error(f"Error during export of {img_name}")
+                close_logger("image_logger")
                 return 1
 
         end = time()

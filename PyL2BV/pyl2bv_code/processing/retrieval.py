@@ -137,6 +137,8 @@ class Retrieval:
         image_logger.info(message)
         if self.show_message:
             self.show_message(message)
+        if self.number_of_models == 0:
+            return True
 
         # Importing the models
         sys.path.append(self.model_path)
