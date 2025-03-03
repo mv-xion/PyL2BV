@@ -74,3 +74,10 @@ def close_logger(logger_name: str):
         logger.removeHandler(handler)
 
     logging.shutdown()  # Ensure all logging resources are freed
+
+
+app_logger = setup_logger(
+        logger_name="app_logger",
+        log_level=logging.INFO,
+        only_log_to_console=True
+    )

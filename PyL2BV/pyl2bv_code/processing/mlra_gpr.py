@@ -5,7 +5,7 @@ from multiprocessing import Pool, cpu_count
 import numpy as np
 from joblib import Parallel, delayed
 
-from PyL2BVgui.pyl2bv_code.processing.mlra import MLRA_Methods
+from PyL2BV.pyl2bv_code.processing.mlra import MLRA_Methods
 
 # Retrieve the loggers by name
 image_logger = logging.getLogger("image_logger")

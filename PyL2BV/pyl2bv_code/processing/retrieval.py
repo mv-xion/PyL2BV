@@ -17,16 +17,16 @@ from matplotlib import pyplot as plt
 from netCDF4 import Dataset
 from spectral.io import envi
 
-from PyL2BVgui.pyl2bv_code.auxiliar.image_read import (
+from PyL2BV.pyl2bv_code.auxiliar.image_read import (
     read_envi,
     read_netcdf,
     show_reflectance_img,
 )
-import PyL2BVgui.pyl2bv_code.auxiliar.logger_config
-from PyL2BVgui.pyl2bv_code.auxiliar.spectra_interpolation import (
+import PyL2BV.pyl2bv_code.auxiliar.logger_config
+from PyL2BV.pyl2bv_code.auxiliar.spectra_interpolation import (
     spline_interpolation,
 )
-from PyL2BVgui.pyl2bv_code.processing.mlra_gpr import MLRA_GPR
+from PyL2BV.pyl2bv_code.processing.mlra_gpr import MLRA_GPR
 
 # Retrieve the loggers by name
 image_logger = logging.getLogger("image_logger")
@@ -76,7 +76,8 @@ class Retrieval:
     def bio_retrieval(self) -> bool:
         message = "Reading image..."
         image_logger.info(message)
-        self.show_message(message)
+        if self.show_message:
+            self.show_message(message)
 
         start = time()
         # __________________________Split image read by file type______________
@@ -93,14 +94,16 @@ class Retrieval:
             if len(image_data) == 4:
                 message = "Map info included"
                 image_logger.info(message)
-                self.show_message(message)
+                if self.show_message:
+                    self.show_message(message)
                 self.map_info = True
                 self.latitude = image_data[2]
                 self.longitude = image_data[3]
             else:
                 message = "No map info"
                 image_logger.info(message)
-                self.show_message(message)
+                if self.show_message:
+                    self.show_message(message)
                 self.map_info = False
         end = time()
         process_time = end - start
@@ -108,7 +111,8 @@ class Retrieval:
 
         message = f"Image read. Elapsed time: {process_time}"
         image_logger.info(message)
-        self.show_message(message)
+        if self.show_message:
+            self.show_message(message)
 
         # Showing image
         if self.plotting:
@@ -124,13 +128,17 @@ class Retrieval:
         except Exception as e:
             message = f"Error: {e}"
             image_logger.error(message)
-            self.show_message(message)
+            if self.show_message:
+                self.show_message(message)
             return True
         list_of_models = list(filter(lambda file: file.endswith(".py"), list_of_files))
         self.number_of_models = len(list_of_models)
         message = f"Getting {self.number_of_models} names was successful."
         image_logger.info(message)
-        self.show_message(message)
+        if self.show_message:
+            self.show_message(message)
+        if self.number_of_models == 0:
+            return True
 
         # Importing the models
         sys.path.append(self.model_path)
@@ -144,9 +152,10 @@ class Retrieval:
             bio_models.append(module)
             message = f"{module.model} imported"
             image_logger.info(message)
-            self.show_message(message)
+            if self.show_message:
+                self.show_message(message)
 
-        # Assuming self.bio_models and self.show_message are defined
+        # self.bio_models and self.show_message are defined
         list(
             map(
                 lambda model_file: import_and_log_model(model_file, self.bio_models),
@@ -159,11 +168,13 @@ class Retrieval:
         def run_model(i):
             message = f"Running {self.bio_models[i].model} model"
             image_logger.info(message)
-            self.show_message(message)
+            if self.show_message:
+                self.show_message(message)
 
             message = "Band selection..."
             image_logger.info(message)
-            self.show_message(message)
+            if self.show_message:
+                self.show_message(message)
 
             # Band selection of the image
             start = time()
@@ -173,11 +184,13 @@ class Retrieval:
 
             message = f"Bands selected."
             image_logger.info(message)
-            self.show_message(message)
+            if self.show_message:
+                self.show_message(message)
 
             message = f"Elapsed time: {process_time}"
             image_logger.info(message)
-            self.show_message(message)
+            if self.show_message:
+                self.show_message(message)
 
             message = f"Shape: {data_refl_new.shape}"
             image_logger.debug(message)
@@ -198,7 +211,8 @@ class Retrieval:
             ):
                 message = f"PCA found in model, performing PCA."
                 image_logger.info(message)
-                self.show_message(message)
+                if self.show_message:
+                    self.show_message(message)
 
                 data_norm = data_norm.dot(self.bio_models[i].pca_mat)
                 message = f"Shape: {data_norm.shape}"
@@ -216,7 +230,8 @@ class Retrieval:
 
                 message = "Running GPR..."
                 image_logger.info(message)
-                self.show_message(message)
+                if self.show_message:
+                    self.show_message(message)
 
                 gpr_object = MLRA_GPR(img_array, model_dict)
                 start = time()
@@ -229,7 +244,8 @@ class Retrieval:
                 process_time = end - start
                 message = f"Elapsed time of GPR: {process_time}"
                 image_logger.info(message)
-                self.show_message(message)
+                if self.show_message:
+                    self.show_message(message)
 
                 # Appending results
                 with self.lock:
@@ -239,7 +255,8 @@ class Retrieval:
 
                 message = f"Retrieval of {self.bio_models[i].veg_index} was successful."
                 image_logger.info(message)
-                self.show_message(message)
+                if self.show_message:
+                    self.show_message(message)
 
         # Use ThreadPoolExecutor to run models in parallel
         with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -265,11 +282,13 @@ class Retrieval:
             ]
             message = "Matching bands found."
             image_logger.info(message)
-            self.show_message(message)
+            if self.show_message:
+                self.show_message(message)
         else:
             message = "No matching bands found, spline interpolation is applied."
             image_logger.info(message)
-            self.show_message(message)
+            if self.show_message:
+                self.show_message(message)
 
             reflectances_new = spline_interpolation(
                 current_wl, self.img_reflectance, expected_wl
@@ -280,7 +299,8 @@ class Retrieval:
     def export_retrieval(self) -> bool:
         message = "Exporting image..."
         image_logger.info(message)
-        self.show_message(message)
+        if self.show_message:
+            self.show_message(message)
 
         start = time()
         # __________________________Split image export by file type______________
@@ -294,12 +314,14 @@ class Retrieval:
 
         message = f"Image exported. Elapsed time:{process_time}"
         image_logger.info(message)
-        self.show_message(message)
+        if self.show_message:
+            self.show_message(message)
 
         if self.plotting:
             message = f"Plotting result images"
             image_logger.info(message)
-            self.show_message(message)
+            if self.show_message:
+                self.show_message(message)
             self.show_results()
         return False
 
@@ -370,7 +392,8 @@ class Retrieval:
 
         message = f"NetCDF file created successfully at: {self.output_file}"
         image_logger.info(message)
-        self.show_message(message)
+        if self.show_message:
+            self.show_message(message)
 
     def export_envi(self):
         # Open the ENVI file
@@ -434,7 +457,8 @@ class Retrieval:
 
         message = f"ENVI file created successfully at: {self.output_file}"
         image_logger.info(message)
-        self.show_message(message)
+        if self.show_message:
+            self.show_message(message)
 
     # TODO: maybe in a new GUI window?
     # Only for CCC, CWC, LAI, FAPAR, FVC yet
