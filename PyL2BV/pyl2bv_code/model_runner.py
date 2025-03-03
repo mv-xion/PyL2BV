@@ -1,0 +1,49 @@
+import logging
+from .processing.processing_module import pyl2bv_processing
+
+app_logger = logging.getLogger("app_logger")  # Retrieve the logger by name
+
+
+def run_retrieval(
+    input_folder_path: str,
+    input_type: str,
+    model_folder_path: str,
+    conversion_factor: float = 0.0001,
+    show_message_callback=None,  # Optional callback for GUI messages
+    plot: bool = False,
+    debug_log: bool = False,
+):
+    """
+    Runs the retrieval function, shared between CLI and GUI.
+    :param input_folder_path: path to the input folder
+    :param input_type: type of input file
+    :param model_folder_path: path to the model folder
+    :param conversion_factor: image conversion factor
+    :param show_message_callback: Optional callback function for GUI messages
+    :param plot: bool to plot the results or not
+    :param debug_log: bool to enable debug logging
+    :return: Completion message
+    """
+    app_logger.info("Starting retrieval.")
+
+    message = pyl2bv_processing(
+        input_folder_path,
+        input_type,
+        model_folder_path,
+        conversion_factor,
+        show_message_callback,
+        plot,
+        debug_log,
+    )
+
+    if message == 1:
+        completion_message = "Something went wrong"
+        app_logger.error(completion_message)
+    elif message == 0:
+        completion_message = "Model ran successfully"
+        app_logger.info(completion_message)
+    else:
+        completion_message = "Unknown error"
+        app_logger.warning(completion_message)
+
+    return completion_message

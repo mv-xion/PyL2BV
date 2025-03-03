@@ -11,8 +11,7 @@ import tkinter as tk
 from tkinter import filedialog, ttk
 
 from datetime import datetime
-from pyl2bv_code.auxiliar.logger_config import setup_logger
-from pyl2bv_code.processing.processing_module import pyl2bv_processing
+from pyl2bv_code.model_runner import run_retrieval
 
 app_logger = logging.getLogger("app_logger")  # Retrieve the logger by name
 
@@ -211,7 +210,7 @@ class SimpleGUI(tk.Tk):
                 # Run the model in a separate thread
                 self.model_thread = threading.Thread(
                     name="RetrievalThread",
-                    target=self.run_model,
+                    target=self.run_retrieval_wrapper,
                     args=(
                         input_folder_path,
                         input_type,
@@ -251,7 +250,7 @@ class SimpleGUI(tk.Tk):
         # Wait 5 seconds before closing the progress window
         self.progress_window.after(5000, self.progress_window.destroy)
 
-    def run_model(
+    def run_retrieval_wrapper(
         self,
         input_folder_path: str,
         input_type: str,
@@ -270,9 +269,8 @@ class SimpleGUI(tk.Tk):
         :param model_folder_path: path to the model folder
         :return: Shows completion message and is able to run again
         """
-        app_logger.info("Running model.")
 
-        message = pyl2bv_processing(
+        completion_message = run_retrieval(
             input_folder_path,
             input_type,
             model_folder_path,
@@ -282,17 +280,7 @@ class SimpleGUI(tk.Tk):
             debug_log,
         )
 
-        if message == 1:
-            completion_message = "Something went wrong"
-            self.progress_label.config(text="Something went wrong")
-            app_logger.error(completion_message)
-        elif message == 0:
-            completion_message = "Model ran successfully"
-            self.progress_label.config(text="Model completed successfully!")
-            app_logger.info(completion_message)
-        else:
-            completion_message = "Unknown Error"
-            app_logger.warning(completion_message)
+        self.progress_label.config(text=completion_message)
 
         # Schedule the display of the completion message in the main thread
         self.after(0, self.show_message, completion_message)
@@ -330,12 +318,6 @@ def main():
     :return:
     """
 
-    log_level = logging.INFO
-    app_logger = setup_logger(
-        logger_name="app_logger",
-        log_level=log_level,
-        only_log_to_console=True
-    )
 
     app_logger.info("Starting the PyL2BV GUI application.")
     gui = SimpleGUI()

@@ -9,8 +9,8 @@ from time import time
 from datetime import datetime
 from shutil import copyfile, rmtree
 
-from PyL2BVgui.pyl2bv_code.auxiliar.logger_config import setup_logger, close_logger
-from PyL2BVgui.pyl2bv_code.processing.retrieval import Retrieval
+from PyL2BV.pyl2bv_code.auxiliar.logger_config import setup_logger, close_logger
+from PyL2BV.pyl2bv_code.processing.retrieval import Retrieval
 
 app_logger = logging.getLogger("app_logger")  # Retrieve the logger by name
 
@@ -60,7 +60,8 @@ def pyl2bv_processing(
     # __________________________Split processing by file type_________________
 
     if input_type == "CHIME netCDF":
-        show_message("Type: " + input_type)
+        if show_message:
+            show_message("Type: " + input_type)
         app_logger.info(f"Processing input type: {input_type}")
 
         # Check input files, log if number of files are not correct
@@ -77,7 +78,8 @@ def pyl2bv_processing(
                 f"Error: {e}\n"
                 f"FAIL: Wrong number of inputs or error loading input image."
             )
-            show_message("Missing input nc file.")
+            if show_message:
+                show_message("Missing input nc file.")
             with open(logfile_path, "w") as fileID:
                 fileID.write(
                     "FAIL: Wrong number of inputs or error loading input image."
@@ -123,7 +125,8 @@ def pyl2bv_processing(
                 copyfile(input_file_qua, l2b_output_file_qua)
             except FileNotFoundError as e:
                 app_logger.error(f"Error: {e}")
-                show_message("Missing complementary files for CHIME image.")
+                if show_message:
+                    show_message("Missing complementary files for CHIME image.")
                 with open(logfile_path, "w") as fileID:
                     fileID.write(
                         "FAIL: Missing complementary files for CHIME image."
@@ -133,9 +136,10 @@ def pyl2bv_processing(
                 return 1
             except Exception as e:
                 app_logger.error(f"Unexpected error: {e}")
-                show_message(
-                    "An unexpected error occurred while copying complementary file."
-                )
+                if show_message:
+                    show_message(
+                        "An unexpected error occurred while copying complementary file."
+                    )
                 with open(logfile_path, "w") as fileID:
                     fileID.write(
                         "FAIL: An unexpected error occurred."
@@ -145,7 +149,8 @@ def pyl2bv_processing(
                 return 1
 
     elif input_type == "ENVI Standard":
-        show_message("Type: " + input_type)
+        if show_message:
+            show_message("Type: " + input_type)
         app_logger.info(f"Processing input type: {input_type}")
 
         # Check input files, log if number of files are not correct
@@ -166,7 +171,8 @@ def pyl2bv_processing(
                 f"Error: {e}\n"
                 f"FAIL: Wrong number of inputs or error loading input file."
             )
-            show_message("Missing input hdr file.")
+            if show_message:
+                show_message("Missing input hdr file.")
             with open(logfile_path, "w") as fileID:
                 fileID.write(
                     "FAIL: Wrong number of inputs or error loading input file."
@@ -221,7 +227,8 @@ def pyl2bv_processing(
 
         # Log image information
         app_logger.info(f"Processing tile: {img_name}")
-        show_message(f"Tile: {img_name}")
+        if show_message:
+            show_message(f"Tile: {img_name}")
         image_logger.info(f"Tile: {img_name}")
 
         # Creating Retrieval object and call function
