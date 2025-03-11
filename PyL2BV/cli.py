@@ -25,6 +25,11 @@ def main():
         help="Image conversion factor",
     )
     parser.add_argument(
+        "chunk_size",
+        type=int,
+        help="Processing chunk size",
+    )
+    parser.add_argument(
         "--plot",
         action="store_true",
         help="Flag to enable plotting",
@@ -42,8 +47,9 @@ def main():
         input_type=args.input_type,
         model_folder_path=args.model_folder_path,
         conversion_factor=args.conversion_factor,
+        chunk_size=args.chunk_size,
         show_message_callback=None,
-        plot=args.plot,
+        plotting=args.plot,
         debug_log=args.debug_log
     )
 

@@ -20,6 +20,7 @@ def pyl2bv_processing(
     input_type: str,
     model_folder_path: str,
     conversion_factor: float,
+    chunk_size: int,
     show_message: callable,
     plotting: bool,
     debug_log: bool,
@@ -33,13 +34,16 @@ def pyl2bv_processing(
     reads the indicated input_type than starts the retrieval process with the models
     specified in model_folder_path.
     Parameters:
-    :param debug_log: bool to set log level to debug mode
-    :param plotting: bool to plot the results or not
+
+
     :type conversion_factor: conversion factor for the retrieval
     :param input_folder_path: path to folder containing input files
     :param input_type: type of input files
     :param model_folder_path: path to folder containing model files
+    :param chunk_size: chunk size in pixels being processed at once (rectangular area of image size x size)
     :param show_message: function for printing messages on GUI
+    :param plotting: bool to plot the results or not
+    :param debug_log: bool to set log level to debug mode
     :return: 0 if successful, 1 if not successful
     """
 
@@ -239,7 +243,9 @@ def pyl2bv_processing(
             l2b_output_files[i],
             model_folder_path,
             conversion_factor,
+            chunk_size,
             plotting,
+            debug_log,
         )
 
         return_value = retrieval_object.bio_retrieval

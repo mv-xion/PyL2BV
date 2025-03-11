@@ -82,6 +82,16 @@ class SimpleGUI(tk.Tk):
         self.entry_conversion_factor.insert(0, "0.0001")  # Set default value
         self.entry_conversion_factor.grid(row=1, column=4, padx=5, pady=5)
 
+        # Adding the Image Conversion Factor entry box
+        self.label_chunk_size= tk.Label(
+            self, text="Chunk Size in Pixels:"
+        )
+        self.label_chunk_size.grid(row=2, column=3, padx=5, pady=5)
+
+        self.entry_chunk_size = NonNegativeNumberEntry(self, width=20)
+        self.entry_chunk_size.insert(0, "300")  # Set default value
+        self.entry_chunk_size.grid(row=2, column=4, padx=5, pady=5)
+
         # Move the Run button one row down
         self.button_run = tk.Button(
             self, text="Run", command=self.start_model_thread
@@ -168,6 +178,7 @@ class SimpleGUI(tk.Tk):
         model_folder_path = self.entry_model_folder.get()
         input_type = self.input_type_var.get()
         conversion_factor = float(self.entry_conversion_factor.get())
+        chunk_size = int(self.entry_chunk_size.get())
         plotting = self.plotting_results_var.get()
         debug_log = bool(self.debug_log_var.get())
         try:
@@ -179,6 +190,7 @@ class SimpleGUI(tk.Tk):
                 app_logger.info(f"Model folder: {model_folder_path}")
                 app_logger.info(f"Input type: {input_type}")
                 app_logger.info(f"Conversion factor: {conversion_factor}")
+                app_logger.info(f"Chunk size: {chunk_size}")
                 app_logger.info(f"Plotting request: {plotting}")
                 app_logger.info(f"Debug log request: {debug_log}")
 
@@ -216,6 +228,7 @@ class SimpleGUI(tk.Tk):
                         input_type,
                         model_folder_path,
                         conversion_factor,
+                        chunk_size,
                         plotting,
                         debug_log,
                     ),
@@ -256,6 +269,7 @@ class SimpleGUI(tk.Tk):
         input_type: str,
         model_folder_path: str,
         conversion_factor: float,
+        chunk_size: int,
         plotting: bool = False,
         debug_log: bool = False,
     ):
@@ -275,6 +289,7 @@ class SimpleGUI(tk.Tk):
             input_type,
             model_folder_path,
             conversion_factor,
+            chunk_size,
             self.show_message,
             plotting,
             debug_log,

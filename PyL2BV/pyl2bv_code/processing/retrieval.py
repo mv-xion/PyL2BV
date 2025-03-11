@@ -3,14 +3,14 @@
     from reading the image to writing the retrieved result
 """
 
-import concurrent.futures
+
 import importlib
-import threading
 import logging
 import os
 import pickle
 import sys
 from time import time
+import concurrent.futures
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -22,7 +22,7 @@ from PyL2BV.pyl2bv_code.auxiliar.image_read import (
     read_netcdf,
     show_reflectance_img,
 )
-import PyL2BV.pyl2bv_code.auxiliar.logger_config
+
 from PyL2BV.pyl2bv_code.auxiliar.spectra_interpolation import (
     spline_interpolation,
 )
@@ -41,7 +41,9 @@ class Retrieval:
         output_file: str,
         model_path: str,
         conversion_factor: float,
+        chunk_size: int,
         plotting: bool,
+        debug_log: bool,
     ):
         """
         Initialise the retrieval class
@@ -53,27 +55,30 @@ class Retrieval:
         :param conversion_factor: image conversion factor
         :param plotting: bool to plot the results or not
         """
-        self.plotting = plotting
-        self.conversion_factor = conversion_factor
-        self.number_of_models = None
+        self.chunk_size = chunk_size
+        self.gpr_models = {}
+        self.chunk_num = None # Storing current chunk number
+        self.number_of_models = None  # Storing number models
         self.bio_models = []  # Storing the models
         self.variable_maps = []  # Storing variable maps
         self.uncertainty_maps = []  # Storing uncertainty maps
         self.model_order = []  # Storing the order the models ran
-        self.lock = threading.Lock()
         self.map_info = None
         self.longitude = None
         self.latitude = None
         self.img_wavelength = None
         self.img_reflectance = None
+        self.plotting = plotting
+        self.conversion_factor = conversion_factor
         self.show_message = show_message
         self.input_file = input_file
         self.input_type = input_type
         self.output_file = output_file
         self.model_path = model_path
+        self.debug_log = debug_log
 
-    @property
-    def bio_retrieval(self) -> bool:
+    # ___________________________________ Read image _____________________________
+    def read_image(self):
         message = "Reading image..."
         image_logger.info(message)
         if self.show_message:
@@ -118,12 +123,12 @@ class Retrieval:
         if self.plotting:
             show_reflectance_img(self.img_reflectance, self.img_wavelength)
 
-        # ___________________________Reading models____________________________
-
+    # _____________________________ Reading models ____________________________
+    def load_models(self):
         # Getting path of the model files
         try:
-            list_of_files = os.listdir(self.model_path)
-            if not list_of_files:
+            list_of_models = [f for f in os.listdir(self.model_path) if f.endswith('.py')]
+            if not list_of_models:
                 raise FileNotFoundError(f"No models found in path: {self.model_path}")
         except Exception as e:
             message = f"Error: {e}"
@@ -131,170 +136,184 @@ class Retrieval:
             if self.show_message:
                 self.show_message(message)
             return True
-        list_of_models = list(filter(lambda file: file.endswith(".py"), list_of_files))
+
         self.number_of_models = len(list_of_models)
         message = f"Getting {self.number_of_models} names was successful."
         image_logger.info(message)
         if self.show_message:
             self.show_message(message)
-        if self.number_of_models == 0:
-            return True
 
         # Importing the models
         sys.path.append(self.model_path)
 
         # Reading the models
-        def import_and_log_model(model_file, bio_models):
+        for model_file in list_of_models:
             # Importing model
             module = importlib.import_module(
                 os.path.splitext(model_file)[0], package=None
             )
-            bio_models.append(module)
-            message = f"{module.model} imported"
-            image_logger.info(message)
-            if self.show_message:
-                self.show_message(message)
-
-        # self.bio_models and self.show_message are defined
-        list(
-            map(
-                lambda model_file: import_and_log_model(model_file, self.bio_models),
-                list_of_models,
-            )
-        )
-
-        # _________________________________Retrieval___________________________________________
-
-        def run_model(i):
-            message = f"Running {self.bio_models[i].model} model"
-            image_logger.info(message)
-            if self.show_message:
-                self.show_message(message)
-
-            message = "Band selection..."
-            image_logger.info(message)
-            if self.show_message:
-                self.show_message(message)
-
-            # Band selection of the image
-            start = time()
-            data_refl_new = self.band_selection(i)
-            end = time()
-            process_time = end - start
-
-            message = f"Bands selected."
-            image_logger.info(message)
-            if self.show_message:
-                self.show_message(message)
-
-            message = f"Elapsed time: {process_time}"
-            image_logger.info(message)
-            if self.show_message:
-                self.show_message(message)
-
-            message = f"Shape: {data_refl_new.shape}"
-            image_logger.debug(message)
-
-            # Normalising the image
-            data_norm = norm_data(
-                data_refl_new,
-                self.bio_models[i].mx_GREEN,
-                self.bio_models[i].sx_GREEN,
-            )
-            message = f"Data normalised: {data_norm.shape}"
-            image_logger.debug(message)
-
-            # Perform PCA if there is data
-            if (
-                hasattr(self.bio_models[i], "pca_mat")
-                and len(self.bio_models[i].pca_mat) > 0
-            ):
-                message = f"PCA found in model, performing PCA."
+            self.bio_models.append(module_to_dict(module))
+            if self.debug_log:
+                message = f"{module.model} imported"
                 image_logger.info(message)
                 if self.show_message:
                     self.show_message(message)
+        self.model_order = [model["veg_index"] for model in self.bio_models]
 
-                data_norm = data_norm.dot(self.bio_models[i].pca_mat)
-                message = f"Shape: {data_norm.shape}"
-                image_logger.debug(message)
+    # _________________________________ Retrieval ___________________________________________
+    def yield_chunks(self):
+        for row in range(0, self.rows, self.chunk_size):
+            for col in range(0, self.cols, self.chunk_size):
+                yield row, min(row + self.chunk_size, self.rows), col, min(col + self.chunk_size, self.cols)
 
-            if self.bio_models[i].model_type == "GPR":
-                # Changing axes to because GPR function takes dim,y,x
-                data_norm = np.swapaxes(
-                    data_norm, 0, 1
-                )  # swapping axes to have the right order after transpose
-                img_array = np.transpose(data_norm)
-
-                # Transform model to dictionary
-                model_dict = module_to_dict(self.bio_models[i])
-
-                message = "Running GPR..."
-                image_logger.info(message)
-                if self.show_message:
-                    self.show_message(message)
-
-                gpr_object = MLRA_GPR(img_array, model_dict)
-                start = time()
-
-                # Starting GPR
-                variable_map, uncertainty_map = gpr_object.perform_mlra()
-                end = time()
-
-                # Logging
-                process_time = end - start
-                message = f"Elapsed time of GPR: {process_time}"
-                image_logger.info(message)
-                if self.show_message:
-                    self.show_message(message)
-
-                # Appending results
-                with self.lock:
-                    self.variable_maps.append(variable_map)
-                    self.uncertainty_maps.append(uncertainty_map)
-                    self.model_order.append(self.bio_models[i].veg_index)
-
-                message = f"Retrieval of {self.bio_models[i].veg_index} was successful."
-                image_logger.info(message)
-                if self.show_message:
-                    self.show_message(message)
-
-        # Use ThreadPoolExecutor to run models in parallel
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            futures = [
-                executor.submit(run_model, i) for i in range(self.number_of_models)
-            ]
-            for future in concurrent.futures.as_completed(futures):
-                try:
-                    future.result()  # This will raise any exceptions caught during execution
-                except Exception as e:
-                    image_logger.error(f"Error in model: {e}")
-                    raise
-
-        return False
-
-    def band_selection(self, i: int) -> np.ndarray:
+    def band_selection(self, i, row_start, row_end, col_start, col_end: int) -> np.array:
         current_wl = self.img_wavelength
-        expected_wl = self.bio_models[i].wave_length
+        expected_wl = self.bio_models[i]["wave_length"]
+        reflectance_chunk = self.img_reflectance[row_start:row_end, col_start:col_end, :]
         # Find the intersection of the two lists of wavelength
         if len(np.intersect1d(current_wl, expected_wl)) == len(expected_wl):
-            reflectances_new = self.img_reflectance[
+            reflectance_chunk_new = reflectance_chunk[
                 :, :, np.where(np.in1d(current_wl, expected_wl))[0]
             ]
-            message = "Matching bands found."
+            if self.chunk_num == 1:
+                message = "Matching bands found."
+                image_logger.info(message)
+                if self.show_message:
+                    self.show_message(message)
+        else:
+            if self.chunk_num == 1:
+                message = "No matching bands found, spline interpolation is applied."
+                image_logger.info(message)
+                if self.show_message:
+                    self.show_message(message)
+
+            reflectance_chunk_new = spline_interpolation(
+                current_wl, reflectance_chunk, expected_wl
+            )
+        return reflectance_chunk_new
+
+    # Normalise data function
+    def norm_data(self, i, reflectance_chunk) -> np.array:
+        return (reflectance_chunk - self.bio_models[i]["mx_GREEN"]) / self.bio_models[i]["sx_GREEN"]
+
+    def process_chunk(self, chunk_coords):
+        row_start, row_end, col_start, col_end = chunk_coords
+        chunk_results = []
+
+        # Inner method to process a single model
+        def process_single_model(i):
+            model = self.bio_models[i]
+            model_key = model["veg_index"]
+
+            # Initialisation message (only first chunk)
+            if self.chunk_num == 1:
+                message = f"Initializing model {model_key}"
+                image_logger.info(message)
+                if self.show_message:
+                    self.show_message(message)
+
+            # Band selection and normalization
+            reflectance_chunk = self.band_selection(i, row_start, row_end, col_start, col_end)
+            reflectance_chunk = self.norm_data(i, reflectance_chunk)
+
+            if "pca_mat" in model and model["pca_mat"].size > 0:
+                if self.chunk_num == 1:
+                    message = f"PCA found in model {model_key}"
+                    image_logger.info(message)
+                    if self.show_message:
+                        self.show_message(message)
+                reflectance_chunk = reflectance_chunk.dot(model["pca_mat"])
+
+            if model["model_type"] == "GPR":
+                # Changing axes to because GPR function takes dim,y,x
+                reflectance_chunk = np.transpose(reflectance_chunk, (2, 0, 1))
+
+                # Initialise MLRA_GPR once per model
+                if self.chunk_num == 1:
+                    message = f"Initializing GPR model {model_key}"
+                    image_logger.info(message)
+                    if self.show_message:
+                        self.show_message(message)
+                    gpr_object = MLRA_GPR(image=reflectance_chunk, bio_model=model)
+                    self.gpr_models[model_key] = gpr_object
+                else:
+                    gpr_object = self.gpr_models[model_key]
+                    gpr_object.image = reflectance_chunk
+
+                # Perform retrieval
+                variable_map, uncertainty_map = gpr_object.perform_mlra()
+                return model_key, variable_map, uncertainty_map
+
+        # Parallelize processing of different models within the chunk
+        with concurrent.futures.ThreadPoolExecutor(
+                max_workers=min(len(self.bio_models), os.cpu_count() // 2)) as executor:
+            future_to_model = {
+                executor.submit(process_single_model, i): self.bio_models[i]["veg_index"]
+                for i in range(len(self.bio_models))
+            }
+
+            for future in concurrent.futures.as_completed(future_to_model):
+                model_key = future_to_model[future]
+                try:
+                    veg_index, variable_map, uncertainty_map = future.result()
+                    chunk_results.append((veg_index, variable_map, uncertainty_map))
+                except Exception as e:
+                    message = f"Model {model_key} generated an exception: {e}"
+                    image_logger.error(message)
+                    if self.show_message:
+                        self.show_message(message)
+                    raise
+
+        return row_start, row_end, col_start, col_end, chunk_results
+    def perform_chunked_retrieval(self):
+        if self.chunk_num == 1:
+            message = f"Running chunked retrieval for {self.number_of_models} models with {self.chunk_size} chunk size"
             image_logger.info(message)
             if self.show_message:
                 self.show_message(message)
-        else:
-            message = "No matching bands found, spline interpolation is applied."
+        start = time()
+        self.variable_maps = {
+            model["veg_index"]: np.zeros((self.rows, self.cols)) for model in self.bio_models
+        }
+        self.uncertainty_maps = {
+            model["veg_index"]: np.zeros((self.rows, self.cols)) for model in self.bio_models
+        }
+
+        chunks = list(self.yield_chunks())
+        total_chunks = len(chunks)
+
+        for idx, chunk_coords in enumerate(chunks, start=1):
+            message = f"Processing chunk {idx}/{total_chunks} - coords {chunk_coords}..."
+            self.chunk_num = idx
             image_logger.info(message)
             if self.show_message:
                 self.show_message(message)
 
-            reflectances_new = spline_interpolation(
-                current_wl, self.img_reflectance, expected_wl
+            image_logger.info(message)
+            if self.show_message:
+                self.show_message(message)
+
+            row_start, row_end, col_start, col_end, chunk_results = self.process_chunk(
+                chunk_coords
             )
 
-        return reflectances_new  # returning the selected bands
+            for veg_index, variable_map, uncertainty_map in chunk_results:
+                    self.variable_maps[veg_index][row_start:row_end, col_start:col_end] = variable_map
+                    self.uncertainty_maps[veg_index][row_start:row_end, col_start:col_end] = uncertainty_map
+
+        end = time()
+        process_time = end - start
+        message = "Chunked retrieval completed successfully. Elapsed time: {:.2f}".format(process_time)
+        image_logger.info(message)
+        if self.show_message:
+            self.show_message(message)
+
+    @property
+    def bio_retrieval(self) -> bool:
+        self.read_image()
+        self.load_models()
+        self.perform_chunked_retrieval()
+        return False
 
     def export_retrieval(self) -> bool:
         message = "Exporting image..."
@@ -375,9 +394,9 @@ class Retrieval:
                 )
                 retrieval_var.units = self.bio_models[
                     i
-                ].units  # Adding the 'Units' attribute
+                ]["units"]  # Adding the 'Units' attribute
                 sd_var = group.createVariable("SD", "f4", dimensions=("Nc", "Nl"))
-                sd_var.units = self.bio_models[i].units
+                sd_var.units = self.bio_models[i]["units"]
                 cv_var = group.createVariable("CV", "f4", dimensions=("Nc", "Nl"))
                 cv_var.units = "%"
                 qf_var = group.createVariable("QF", "i1", dimensions=("Nc", "Nl"))
@@ -385,8 +404,8 @@ class Retrieval:
 
                 # Assign data to the variable
                 # Transpose for matlab type output
-                retrieval_var[:] = np.transpose(self.variable_maps[i])
-                sd_var[:] = np.transpose(self.uncertainty_maps[i])
+                retrieval_var[:] = np.transpose(self.variable_maps[self.model_order[i]])
+                sd_var[:] = np.transpose(self.uncertainty_maps[self.model_order[i]])
         finally:
             nc_file.close()  # Closing the file
 
@@ -460,7 +479,6 @@ class Retrieval:
         if self.show_message:
             self.show_message(message)
 
-    # TODO: maybe in a new GUI window?
     # Only for CCC, CWC, LAI, FAPAR, FVC yet
     def show_results(self):
         """
@@ -548,7 +566,7 @@ class Retrieval:
 
             # Plot and save variable map
             plot_and_save(
-                data=self.variable_maps[i],
+                data=self.variable_maps[veg_index],
                 veg_index=veg_index,
                 colormap=colormap,
                 dimension=dimension,
@@ -559,7 +577,7 @@ class Retrieval:
 
             # Plot and save uncertainty map
             plot_and_save(
-                data=self.uncertainty_maps[i],
+                data=self.uncertainty_maps[veg_index],
                 veg_index=veg_index,
                 colormap="jet",
                 dimension=dimension,
@@ -568,11 +586,6 @@ class Retrieval:
                 vec_dir=vec_dir,
                 suffix="_uncertainty",
             )
-
-
-# Normalise data function
-def norm_data(data: np.ndarray, mean: float, std: float) -> np.ndarray:
-    return (data - mean) / std
 
 
 # Parallel multiprocess cant pick modules
