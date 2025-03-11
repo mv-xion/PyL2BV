@@ -1,12 +1,13 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="PyL2BVcli",
-    version="0.1",
+    name="PyL2BV",
+    version="1.0.0",
     packages=find_packages(),
     install_requires=[
         "certifi==2024.8.30",
         "cftime==1.6.4.post1",
+        "click==8.1.7",
         "contourpy==1.3.0",
         "cycler==0.12.1",
         "fonttools==4.54.1",
@@ -26,7 +27,20 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "pyl2bv-cli=PyL2BVcli.cli:main",
+            "pyl2bv-cli=pyl2bv_code.cli:main",
+            "pyl2bv-gui=pyl2bv_code.gui:main",
         ],
     },
+    author="Viktor Ixion Mészáros",
+    author_email="xixion2@gmail.com",
+    description="A package for ARTMO-based GPR models on hyperspectral images.",
+    long_description=open("README.md").read(),
+    long_description_content_type="text/markdown",
+    url="https://github.com/mv-xion/PyL2BV",
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+    ],
+    python_requires=">=3.10",
 )
