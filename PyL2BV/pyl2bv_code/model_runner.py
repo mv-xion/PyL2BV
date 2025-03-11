@@ -9,8 +9,9 @@ def run_retrieval(
     input_type: str,
     model_folder_path: str,
     conversion_factor: float = 0.0001,
-    show_message_callback=None,  # Optional callback for GUI messages
-    plot: bool = False,
+    chunk_size: int = 300,
+    show_message_callback = None,  # Optional callback for GUI messages
+    plotting: bool = False,
     debug_log: bool = False,
 ):
     """
@@ -19,8 +20,9 @@ def run_retrieval(
     :param input_type: type of input file
     :param model_folder_path: path to the model folder
     :param conversion_factor: image conversion factor
+    :param chunk_size: chunk size in pixels being processed at once (rectangular area of image size x size)
     :param show_message_callback: Optional callback function for GUI messages
-    :param plot: bool to plot the results or not
+    :param plotting: bool to plot the results or not
     :param debug_log: bool to enable debug logging
     :return: Completion message
     """
@@ -31,8 +33,9 @@ def run_retrieval(
         input_type,
         model_folder_path,
         conversion_factor,
+        chunk_size,
         show_message_callback,
-        plot,
+        plotting,
         debug_log,
     )
 
