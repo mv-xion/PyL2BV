@@ -49,7 +49,6 @@ class MLRA_GPR(MLRA_Methods):
 
     def perform_mlra(self) -> tuple:
         try:
-            image_logger.info("Starting perform_mlra.")
 
             ydim, xdim = self.image.shape[1:]
             num_pixels = ydim * xdim
@@ -72,7 +71,6 @@ class MLRA_GPR(MLRA_Methods):
             variable_map = mean_pred.reshape(ydim, xdim)
             uncertainty_map = Variance.reshape(ydim, xdim)
 
-            image_logger.info("Completed perform_mlra.")
             return variable_map, uncertainty_map
         except Exception as e:
             image_logger.error(f"Error in perform_mlra: {e}")
