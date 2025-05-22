@@ -1,9 +1,8 @@
 import logging
-import math
-from multiprocessing import Pool, cpu_count
-
 import numpy as np
-from joblib import Parallel, delayed
+
+from multiprocessing import cpu_count
+from joblib import parallel_backend, Parallel, delayed
 
 from PyL2BV.pyl2bv_code.processing.mlra import MLRA_Methods
 
@@ -14,7 +13,7 @@ image_logger = logging.getLogger("image_logger")
 class MLRA_GPR(MLRA_Methods):
     def __init__(self, image: np.ndarray, bio_model) -> None:
         super().__init__(image, bio_model)
-        image_logger.info("Initialized MLRA_GPR with image and bio_model.")
+        image_logger.debug("Initialized MLRA_GPR with image and bio_model.")
 
         # Load large arrays once
         self.hyp_ell_GREEN = bio_model["hyp_ell_GREEN"]
@@ -57,13 +56,15 @@ class MLRA_GPR(MLRA_Methods):
 
             # Split into smaller batches for parallel processing
             num_cores = cpu_count()
-            batch_size = num_pixels // num_cores
-            pixel_batches = np.array_split(pixels, num_cores)
+
+            batch_size = max(1000, num_pixels // (num_cores * 2))
+            pixel_batches = [pixels[i:i + batch_size] for i in range(0, num_pixels, batch_size)]
 
             # Parallelize pixel batch processing
-            results = Parallel(n_jobs=num_cores)(
-                delayed(self.process_pixel_batch)(batch) for batch in pixel_batches
-            )
+            with parallel_backend("loky", n_jobs=num_cores):
+                results = Parallel()(
+                    delayed(self.process_pixel_batch)(batch) for batch in pixel_batches
+                )
 
             mean_pred = np.concatenate([res[0] for res in results])
             Variance = np.concatenate([res[1] for res in results])

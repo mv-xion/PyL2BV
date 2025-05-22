@@ -8,6 +8,9 @@ import os
 from time import time
 from datetime import datetime
 from shutil import copyfile, rmtree
+from dataclasses import dataclass
+from typing import List, Tuple, Optional
+import numpy as np
 
 from PyL2BV.pyl2bv_code.auxiliar.logger_config import setup_logger, close_logger
 from PyL2BV.pyl2bv_code.processing.retrieval import Retrieval
@@ -15,15 +18,23 @@ from PyL2BV.pyl2bv_code.processing.retrieval import Retrieval
 app_logger = logging.getLogger("app_logger")  # Retrieve the logger by name
 
 
+# Return structure after processing
+@dataclass
+class RetrievalResult:
+    success: bool
+    message: str
+    plots: Optional[List[Tuple[np.ndarray, str, str]]] = None  # (image, title, colormap)
+
+
 def pyl2bv_processing(
-    input_folder_path: str,
-    input_type: str,
-    model_folder_path: str,
-    conversion_factor: float,
-    chunk_size: int,
-    show_message: callable,
-    plotting: bool,
-    debug_log: bool,
+        input_folder_path: str,
+        input_type: str,
+        model_folder_path: str,
+        conversion_factor: float,
+        chunk_size: int,
+        show_message: callable,
+        plotting: bool,
+        debug_log: bool,
 ):
     """
     PyL2BV retrieval module for ARTMO based models:
@@ -44,7 +55,7 @@ def pyl2bv_processing(
     :param show_message: function for printing messages on GUI
     :param plotting: bool to plot the results or not
     :param debug_log: bool to set log level to debug mode
-    :return: 0 if successful, 1 if not successful
+    :return: RetrievalResult: success True or False, message and plots
     """
 
     # __________________________Construct variables___________________________
@@ -72,25 +83,21 @@ def pyl2bv_processing(
         list_of_files = os.listdir(input_path)
         # Filter files with .nc extension
         nc_files = [file for file in list_of_files if file.endswith(".nc")]
-        try:
-            if len(nc_files) % 4 != 0 or not list_of_files:
-                # If output folder exists, delete it and make a new one
-                make_output_folder(output_path)
-                raise FileNotFoundError("Missing input nc file.")
-        except Exception as e:
+        if not nc_files or len(nc_files) % 4 != 0:
+            # If output folder exists, delete it and make a new one
+            make_output_folder(output_path)
             app_logger.error(
-                f"Error: {e}\n"
                 f"FAIL: Wrong number of inputs or error loading input image."
             )
             if show_message:
                 show_message("Missing input nc file.")
             with open(logfile_path, "w") as fileID:
                 fileID.write(
-                    "FAIL: Wrong number of inputs or error loading input image."
+                    "FAIL: Wrong number of .nc inputs or error loading input image."
                     " Consider checking Input Path/File \n"
                 )
                 fileID.write(f"Input Path: {input_path} \n")
-            return 1
+            raise FileNotFoundError("Missing or incomplete .nc input files.")
 
         # Counting input files
         pos_img_files = [i for i, name in enumerate(nc_files) if "IMG" in name]
@@ -114,8 +121,8 @@ def pyl2bv_processing(
             input_file_name = input_names[i]
             # Configuration works for CHIME image name convention now
             pos = [j for j, char in enumerate(input_file_name) if char == "_"]
-            scene_time = input_file_name[pos[3] + 1 : pos[4]]
-            tile = input_file_name[pos[5] + 1 :]
+            scene_time = input_file_name[pos[3] + 1: pos[4]]
+            tile = input_file_name[pos[5] + 1:]
             l2b_output_files.append(
                 f"{l2b_output}{scene_time}_{proces_time}_{tile}"
             )
@@ -137,7 +144,7 @@ def pyl2bv_processing(
                         " Consider checking Input Path/File \n"
                     )
                     fileID.write(f"Input Path: {input_path} \n")
-                return 1
+                return RetrievalResult(success=False, message="Something went wrong", plots=None)
             except Exception as e:
                 app_logger.error(f"Unexpected error: {e}")
                 if show_message:
@@ -150,7 +157,7 @@ def pyl2bv_processing(
                         " Consider checking Input Path/File \n"
                     )
                     fileID.write(f"Input Path: {input_path} \n")
-                return 1
+                return RetrievalResult(success=False, message="Something went wrong", plots=None)
 
     elif input_type == "ENVI Standard":
         if show_message:
@@ -161,18 +168,14 @@ def pyl2bv_processing(
         list_of_files = os.listdir(input_path)
         # Filter files with .hdr extension
         hdr_files = [file for file in list_of_files if file.endswith(".hdr")]
-        try:
-            if not list_of_files:
-                # If output folder exists, delete it and make a new one
-                if os.path.exists(output_path):
-                    rmtree(output_path)
-                    os.makedirs(output_path)
-                else:
-                    os.makedirs(output_path)
-                raise FileNotFoundError("Missing input hdr file.")
-        except Exception as e:
+        if not hdr_files:
+            # If output folder exists, delete it and make a new one
+            if os.path.exists(output_path):
+                rmtree(output_path)
+                os.makedirs(output_path)
+            else:
+                os.makedirs(output_path)
             app_logger.error(
-                f"Error: {e}\n"
                 f"FAIL: Wrong number of inputs or error loading input file."
             )
             if show_message:
@@ -183,7 +186,7 @@ def pyl2bv_processing(
                     " Consider checking Input Path/File \n"
                 )
                 fileID.write(f"Input Path: {input_path} \n")
-            return 1
+            raise FileNotFoundError("Missing input hdr file.")
 
         # Counting input files
         num_images = len(hdr_files)  # Number of image files
@@ -206,9 +209,10 @@ def pyl2bv_processing(
         flag_out = make_output_folder(output_path)
     else:
         app_logger.error("Invalid input format")
-        return 1
+        raise ValueError(f"Unsupported input type: {input_type}")
 
     # ____________________________________Retrieval________________________________
+    all_plots = []  # Collect plots from all images if GUI+plotting
     # Biophysical parameters retrieval
     for i in range(num_images):
         start = time()
@@ -230,44 +234,56 @@ def pyl2bv_processing(
                 image_logger.debug("Output folder does not exist. Folder was created.")
 
         # Log image information
-        app_logger.info(f"Processing tile: {img_name}")
         if show_message:
             show_message(f"Tile: {img_name}")
-        image_logger.info(f"Tile: {img_name}")
+        image_logger.info(f"Processing tile:: {img_name}")
 
-        # Creating Retrieval object and call function
-        retrieval_object = Retrieval(
-            show_message,
-            input_files[i],
-            input_type,
-            l2b_output_files[i],
-            model_folder_path,
-            conversion_factor,
-            chunk_size,
-            plotting,
-            debug_log,
-        )
+        try:
+            # Creating Retrieval object and call function
+            retrieval_object = Retrieval(
+                show_message,
+                input_files[i],
+                input_type,
+                l2b_output_files[i],
+                model_folder_path,
+                conversion_factor,
+                chunk_size,
+                plotting,
+                debug_log,
+            )
 
-        return_value = retrieval_object.bio_retrieval
-        if return_value == 1:  # There was an error
-            image_logger.error(f"Error during retrieval of {img_name}")
+            retrieval_object.bio_retrieval()
+            retrieval_object.export_retrieval()
+            if plotting:
+                image_plots = retrieval_object.show_results()
+                if image_plots:
+                    all_plots.extend(image_plots)
+
+            end = time()
+            process_time = end - start
+
+            image_logger.info(f"Total retrieval. Elapsed time: {process_time}")
+            image_logger.info(f"Retrieval of {img_name} successful.\n")
             close_logger("image_logger")
-            return 1
-        else:
-            export_value = retrieval_object.export_retrieval()
-            if export_value == 1:  # There was an error
-                image_logger.error(f"Error during export of {img_name}")
-                close_logger("image_logger")
-                return 1
+        except Exception as e:
+            close_logger("image_logger")
+            app_logger.error(f"Error processing tile {img_name}: {e}")
+            if show_message:
+                show_message(f"Error processing tile {img_name}: {e}")
+            return RetrievalResult(success=False, message="Something went wrong", plots=None)
 
-        end = time()
-        process_time = end - start
-
-        image_logger.info(f"Total retrieval. Elapsed time: {process_time}")
-        image_logger.info(f"Retrieval of {img_name} successful.\n")
-        close_logger("image_logger")
-
-    return 0
+    if plotting:
+        return RetrievalResult(
+            success=True,
+            message="Model ran successfully with plots",
+            plots=all_plots
+        )
+    else:
+        return RetrievalResult(
+            success=True,
+            message="Model ran successfully",
+            plots=None
+        )
 
 
 def make_output_folder(output_path: str) -> bool:
