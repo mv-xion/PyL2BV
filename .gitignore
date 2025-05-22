@@ -1,4 +1,8 @@
-input/
+dist/
+input_envi/
+input_prisma/
+input_small/
+input_large/
 output/
 /.idea
 /.logs
