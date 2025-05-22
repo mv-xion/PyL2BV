@@ -27,6 +27,12 @@ from PyL2BV.pyl2bv_code.auxiliar.spectra_interpolation import (
     spline_interpolation,
 )
 from PyL2BV.pyl2bv_code.processing.mlra_gpr import MLRA_GPR
+from time import time
+
+import warnings
+
+warnings.filterwarnings("ignore", message="Starting a Matplotlib GUI outside of the main thread")
+
 
 # Retrieve the loggers by name
 image_logger = logging.getLogger("image_logger")
@@ -34,16 +40,16 @@ image_logger = logging.getLogger("image_logger")
 
 class Retrieval:
     def __init__(
-        self,
-        show_message: callable,
-        input_file: str,
-        input_type: str,
-        output_file: str,
-        model_path: str,
-        conversion_factor: float,
-        chunk_size: int,
-        plotting: bool,
-        debug_log: bool,
+            self,
+            show_message: callable,
+            input_file: str,
+            input_type: str,
+            output_file: str,
+            model_path: str,
+            conversion_factor: float,
+            chunk_size: int,
+            plotting: bool,
+            debug_log: bool,
     ):
         """
         Initialise the retrieval class
@@ -55,9 +61,10 @@ class Retrieval:
         :param conversion_factor: image conversion factor
         :param plotting: bool to plot the results or not
         """
+        self.initial_plot = None
         self.chunk_size = chunk_size
         self.gpr_models = {}
-        self.chunk_num = None # Storing current chunk number
+        self.chunk_num = None  # Storing current chunk number
         self.number_of_models = None  # Storing number models
         self.bio_models = []  # Storing the models
         self.variable_maps = []  # Storing variable maps
@@ -80,8 +87,8 @@ class Retrieval:
     # ___________________________________ Read image _____________________________
     def read_image(self):
         message = "Reading image..."
-        image_logger.info(message)
-        if self.show_message:
+        image_logger.debug(message)
+        if self.show_message and self.debug_log:
             self.show_message(message)
 
         start = time()
@@ -98,16 +105,16 @@ class Retrieval:
             self.img_wavelength = image_data[1]  # save wavelength
             if len(image_data) == 4:
                 message = "Map info included"
-                image_logger.info(message)
-                if self.show_message:
+                image_logger.debug(message)
+                if self.show_message and self.debug_log:
                     self.show_message(message)
                 self.map_info = True
                 self.latitude = image_data[2]
                 self.longitude = image_data[3]
             else:
                 message = "No map info"
-                image_logger.info(message)
-                if self.show_message:
+                image_logger.debug(message)
+                if self.show_message and self.debug_log:
                     self.show_message(message)
                 self.map_info = False
         end = time()
@@ -115,33 +122,23 @@ class Retrieval:
         self.rows, self.cols, self.dims = self.img_reflectance.shape
 
         message = f"Image read. Elapsed time: {process_time}"
-        image_logger.info(message)
-        if self.show_message:
+        image_logger.debug(message)
+        if self.show_message and self.debug_log:
             self.show_message(message)
 
-        # Showing image
+        # Save for GUI or CLI later
         if self.plotting:
-            show_reflectance_img(self.img_reflectance, self.img_wavelength)
+            rgb_image, title, cmap = show_reflectance_img(self.img_reflectance, self.img_wavelength)
+            self.initial_plot = (rgb_image, title, cmap)
 
     # _____________________________ Reading models ____________________________
     def load_models(self):
         # Getting path of the model files
-        try:
-            list_of_models = [f for f in os.listdir(self.model_path) if f.endswith('.py')]
-            if not list_of_models:
-                raise FileNotFoundError(f"No models found in path: {self.model_path}")
-        except Exception as e:
-            message = f"Error: {e}"
-            image_logger.error(message)
-            if self.show_message:
-                self.show_message(message)
-            return True
+        list_of_models = [f for f in os.listdir(self.model_path) if f.endswith('.py')]
+        if not list_of_models:
+            raise FileNotFoundError(f"No models found in path: {self.model_path}")
 
         self.number_of_models = len(list_of_models)
-        message = f"Getting {self.number_of_models} names was successful."
-        image_logger.info(message)
-        if self.show_message:
-            self.show_message(message)
 
         # Importing the models
         sys.path.append(self.model_path)
@@ -155,10 +152,14 @@ class Retrieval:
             self.bio_models.append(module_to_dict(module))
             if self.debug_log:
                 message = f"{module.model} imported"
-                image_logger.info(message)
-                if self.show_message:
+                image_logger.debug(message)
+                if self.show_message and self.debug_log:
                     self.show_message(message)
         self.model_order = [model["veg_index"] for model in self.bio_models]
+        message = f"Loading {self.number_of_models} models was successful: {self.model_order}"
+        image_logger.info(message)
+        if self.show_message:
+            self.show_message(message)
 
     # _________________________________ Retrieval ___________________________________________
     def yield_chunks(self):
@@ -173,18 +174,18 @@ class Retrieval:
         # Find the intersection of the two lists of wavelength
         if len(np.intersect1d(current_wl, expected_wl)) == len(expected_wl):
             reflectance_chunk_new = reflectance_chunk[
-                :, :, np.where(np.in1d(current_wl, expected_wl))[0]
-            ]
+                                    :, :, np.where(np.in1d(current_wl, expected_wl))[0]
+                                    ]
             if self.chunk_num == 1:
-                message = "Matching bands found."
-                image_logger.info(message)
-                if self.show_message:
+                message = f"Matching bands found for {self.bio_models[i]['veg_index']}"
+                image_logger.debug(message)
+                if self.show_message and self.debug_log:
                     self.show_message(message)
         else:
             if self.chunk_num == 1:
-                message = "No matching bands found, spline interpolation is applied."
-                image_logger.info(message)
-                if self.show_message:
+                message = f"No matching bands for {self.bio_models[i]['veg_index']} spline interpolation is applied."
+                image_logger.debug(message)
+                if self.show_message and self.debug_log:
                     self.show_message(message)
 
             reflectance_chunk_new = spline_interpolation(
@@ -208,8 +209,8 @@ class Retrieval:
             # Initialisation message (only first chunk)
             if self.chunk_num == 1:
                 message = f"Initializing model {model_key}"
-                image_logger.info(message)
-                if self.show_message:
+                image_logger.debug(message)
+                if self.show_message and self.debug_log:
                     self.show_message(message)
 
             # Band selection and normalization
@@ -219,8 +220,8 @@ class Retrieval:
             if "pca_mat" in model and model["pca_mat"].size > 0:
                 if self.chunk_num == 1:
                     message = f"PCA found in model {model_key}"
-                    image_logger.info(message)
-                    if self.show_message:
+                    image_logger.debug(message)
+                    if self.show_message and self.debug_log:
                         self.show_message(message)
                 reflectance_chunk = reflectance_chunk.dot(model["pca_mat"])
 
@@ -265,12 +266,12 @@ class Retrieval:
                     raise
 
         return row_start, row_end, col_start, col_end, chunk_results
+
     def perform_chunked_retrieval(self):
-        if self.chunk_num == 1:
-            message = f"Running chunked retrieval for {self.number_of_models} models with {self.chunk_size} chunk size"
-            image_logger.info(message)
-            if self.show_message:
-                self.show_message(message)
+        message = f"Running chunked retrieval for {self.number_of_models} models with {self.chunk_size} chunk size"
+        image_logger.info(message)
+        if self.show_message:
+            self.show_message(message)
         start = time()
         self.variable_maps = {
             model["veg_index"]: np.zeros((self.rows, self.cols)) for model in self.bio_models
@@ -283,12 +284,9 @@ class Retrieval:
         total_chunks = len(chunks)
 
         for idx, chunk_coords in enumerate(chunks, start=1):
+            chunk_start = time()
             message = f"Processing chunk {idx}/{total_chunks} - coords {chunk_coords}..."
             self.chunk_num = idx
-            image_logger.info(message)
-            if self.show_message:
-                self.show_message(message)
-
             image_logger.info(message)
             if self.show_message:
                 self.show_message(message)
@@ -298,8 +296,13 @@ class Retrieval:
             )
 
             for veg_index, variable_map, uncertainty_map in chunk_results:
-                    self.variable_maps[veg_index][row_start:row_end, col_start:col_end] = variable_map
-                    self.uncertainty_maps[veg_index][row_start:row_end, col_start:col_end] = uncertainty_map
+                self.variable_maps[veg_index][row_start:row_end, col_start:col_end] = variable_map
+                self.uncertainty_maps[veg_index][row_start:row_end, col_start:col_end] = uncertainty_map
+            chunk_end = time()
+            message = f"Chunk time: {chunk_end - chunk_start}s"
+            image_logger.debug(message)
+            if self.show_message and self.debug_log:
+                self.show_message(message)
 
         end = time()
         process_time = end - start
@@ -308,41 +311,41 @@ class Retrieval:
         if self.show_message:
             self.show_message(message)
 
-    @property
-    def bio_retrieval(self) -> bool:
-        self.read_image()
-        self.load_models()
-        self.perform_chunked_retrieval()
-        return False
-
-    def export_retrieval(self) -> bool:
-        message = "Exporting image..."
-        image_logger.info(message)
-        if self.show_message:
-            self.show_message(message)
-
-        start = time()
-        # __________________________Split image export by file type______________
-
-        if self.input_type == "CHIME netCDF":
-            self.export_netcdf()
-        elif self.input_type == "ENVI Standard":
-            self.export_envi()
-        end = time()
-        process_time = end - start
-
-        message = f"Image exported. Elapsed time:{process_time}"
-        image_logger.info(message)
-        if self.show_message:
-            self.show_message(message)
-
-        if self.plotting:
-            message = f"Plotting result images"
-            image_logger.info(message)
+    def bio_retrieval(self) -> None:
+        try:
+            self.read_image()
+            self.load_models()
+            self.perform_chunked_retrieval()
+        except Exception as e:
+            image_logger.error(f"Error during bio_retrieval: {e}")
             if self.show_message:
+                self.show_message(f"Error during bio_retrieval: {e}")
+            raise RuntimeError(f"Error during bio_retrieval: {e}") from e
+
+    def export_retrieval(self) -> None:
+        try:
+            message = "Exporting image..."
+            image_logger.debug(message)
+            if self.show_message and self.debug_log:
                 self.show_message(message)
-            self.show_results()
-        return False
+
+            start = time()
+            # __________________________Split image export by file type______________
+
+            if self.input_type == "CHIME netCDF":
+                self.export_netcdf()
+            elif self.input_type == "ENVI Standard":
+                self.export_envi()
+            end = time()
+            process_time = end - start
+
+            message = f"Image exported. Elapsed time:{process_time}"
+            image_logger.debug(message)
+            if self.show_message and self.debug_log:
+                self.show_message(message)
+        except Exception as e:
+            image_logger.error(f"Error during export_retrieval: {e}")
+            raise RuntimeError(f"Error during export_retrieval: {e}")
 
     def export_netcdf(self):
         # Creating output image
@@ -456,12 +459,11 @@ class Retrieval:
         # Both lists must have the same length
         assert len(self.variable_maps) == len(self.uncertainty_maps)
 
-        # Create an interleaved list of matrices
-        interleaved_matrices = [
-            matrix
-            for pair in zip(self.variable_maps, self.uncertainty_maps)
-            for matrix in pair
-        ]
+        #  Create an interleaved list of matrices using correct order
+        interleaved_matrices = []
+        for veg_index in self.model_order:
+            interleaved_matrices.append(self.variable_maps[veg_index])
+            interleaved_matrices.append(self.uncertainty_maps[veg_index])
 
         # Stack the interleaved matrices along a new axis
         stacked_data = np.stack(interleaved_matrices, axis=-1)
@@ -486,6 +488,15 @@ class Retrieval:
         :return: plot images, save in files
         !! Colors only for CCC,CWC, LAI for now !!
         """
+        message = f"Plotting result images"
+        image_logger.info(message)
+        if self.show_message:
+            self.show_message(message)
+
+        plots_to_display = []  # to store data to plot later in GUI
+        if hasattr(self, "initial_plot"):
+            plots_to_display.insert(0, self.initial_plot)
+
         # Create directories for images
         img_dir = os.path.join(os.path.dirname(self.output_file), "images")
         # Check if the directory exists, and create it if it does not
@@ -512,18 +523,19 @@ class Retrieval:
             "FAPAR": "Reds",
             "FVC": "Oranges",
             "CCC": "Greens",
-            "CWC": "Blues",  # TODO: Need more colors
+            "CWC": "Blues",
+            "CNC": "Purples"
         }
 
         def plot_and_save(
-            data,
-            veg_index,
-            colormap,
-            dimension,
-            output_file,
-            img_dir,
-            vec_dir,
-            suffix="",
+                data,
+                veg_index,
+                colormap,
+                dimension,
+                output_file,
+                img_dir,
+                vec_dir,
+                suffix="",
         ):
             """
             Generalized function to plot, save, and display images.
@@ -540,9 +552,8 @@ class Retrieval:
             """
             # Plot the data
             plt.imshow(data, cmap=colormap)
-            plt.title(
-                f"{'Uncertainty of ' if suffix else 'Estimated '}{veg_index} map {dimension}"
-            )
+            title = f"{'Uncertainty of ' if suffix else 'Estimated '}{veg_index} map {dimension}"
+            plt.title(title)
             plt.colorbar()
             plt.tight_layout()
 
@@ -556,7 +567,9 @@ class Retrieval:
                 os.path.join(vec_dir, f"{base_name}{veg_index}{suffix}.pdf"),
                 bbox_inches="tight",
             )
-            plt.show()
+            plt.close()
+            # Return data for GUI display
+            return data, title, colormap
 
         # Loop through models
         for i in range(self.number_of_models):
@@ -565,19 +578,21 @@ class Retrieval:
             dimension = veg_index_to_dimension.get(veg_index, "(unknown dimension)")
 
             # Plot and save variable map
-            plot_and_save(
-                data=self.variable_maps[veg_index],
+            var_data = self.variable_maps[veg_index]
+            plots_to_display.append(plot_and_save(
+                data=var_data,
                 veg_index=veg_index,
                 colormap=colormap,
                 dimension=dimension,
                 output_file=self.output_file,
                 img_dir=img_dir,
                 vec_dir=vec_dir,
-            )
+            ))
 
             # Plot and save uncertainty map
-            plot_and_save(
-                data=self.uncertainty_maps[veg_index],
+            unc_data = self.uncertainty_maps[veg_index]
+            plots_to_display.append(plot_and_save(
+                data=unc_data,
                 veg_index=veg_index,
                 colormap="jet",
                 dimension=dimension,
@@ -585,7 +600,9 @@ class Retrieval:
                 img_dir=img_dir,
                 vec_dir=vec_dir,
                 suffix="_uncertainty",
-            )
+            ))
+
+        return plots_to_display
 
 
 # Parallel multiprocess cant pick modules
