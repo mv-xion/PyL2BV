@@ -162,10 +162,18 @@ class Retrieval:
             self.show_message(message)
 
     # _________________________________ Retrieval ___________________________________________
-    def yield_chunks(self):
-        for row in range(0, self.rows, self.chunk_size):
+
+    def yield_chunks(self, mode="row"):
+        if mode == "column":
             for col in range(0, self.cols, self.chunk_size):
-                yield row, min(row + self.chunk_size, self.rows), col, min(col + self.chunk_size, self.cols)
+                yield 0, self.rows, col, min(col + self.chunk_size, self.cols)
+        elif mode == "row":
+            for row in range(0, self.rows, self.chunk_size):
+                yield row, min(row + self.chunk_size, self.rows), 0, self.cols
+        else:
+            for row in range(0, self.rows, self.chunk_size):
+                for col in range(0, self.cols, self.chunk_size):
+                    yield row, min(row + self.chunk_size, self.rows), col, min(col + self.chunk_size, self.cols)
 
     def band_selection(self, i, row_start, row_end, col_start, col_end: int) -> np.array:
         current_wl = self.img_wavelength
