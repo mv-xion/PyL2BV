@@ -1,5 +1,5 @@
 import logging
-from .processing.processing_module import pyl2bv_processing
+from PyL2BV.pyl2bv_code.processing.processing_module import pyl2bv_processing, RetrievalResult
 
 app_logger = logging.getLogger("app_logger")  # Retrieve the logger by name
 

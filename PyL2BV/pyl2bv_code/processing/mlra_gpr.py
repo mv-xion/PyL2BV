@@ -1,7 +1,4 @@
 import logging
-import math
-from multiprocessing import Pool, cpu_count
-
 import numpy as np
 
 from multiprocessing import cpu_count

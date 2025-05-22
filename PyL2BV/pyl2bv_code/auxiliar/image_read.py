@@ -5,11 +5,9 @@
 
 import logging
 import os
-
-import matplotlib.pyplot as plt
 import numpy as np
 
-# Importing packages
+from typing import Tuple
 from netCDF4 import Dataset
 from pyproj import Proj
 from spectral.io.envi import open

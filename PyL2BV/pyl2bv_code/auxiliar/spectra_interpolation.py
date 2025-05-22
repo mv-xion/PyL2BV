@@ -5,11 +5,7 @@
 
 import logging
 
-from joblib import Parallel, delayed
-import numpy as np
 from scipy.interpolate import make_interp_spline
-from multiprocessing import cpu_count
-
 
 # Retrieve the loggers by name
 image_logger = logging.getLogger("image_logger")

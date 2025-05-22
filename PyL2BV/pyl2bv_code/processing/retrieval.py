@@ -3,16 +3,14 @@
     from reading the image to writing the retrieved result
 """
 
-
 import importlib
 import logging
 import os
 import pickle
 import sys
-from time import time
 import concurrent.futures
-
 import numpy as np
+
 from matplotlib import pyplot as plt
 from netCDF4 import Dataset
 from spectral.io import envi

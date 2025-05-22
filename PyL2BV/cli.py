@@ -1,5 +1,6 @@
 import argparse
-from .pyl2bv_code.model_runner import run_retrieval
+import matplotlib.pyplot as plt
+from PyL2BV.pyl2bv_code.model_runner import run_retrieval
 
 
 def main():

@@ -1,19 +1,16 @@
 """
     Configure logger class for logging
 """
-
+import logging
 import logging.config
 from logging.handlers import RotatingFileHandler
 
-import logging
-import logging.config
-
 
 def setup_logger(
-    logger_name: str,
-    logfile_name: str = "debug_log.log",
-    log_level: int = logging.DEBUG,
-    only_log_to_console: bool = False,
+        logger_name: str,
+        logfile_name: str = "debug_log.log",
+        log_level: int = logging.DEBUG,
+        only_log_to_console: bool = False,
 ) -> logging.Logger:
     """
     Sets up and returns a logger with the specified name and configuration.
@@ -77,7 +74,7 @@ def close_logger(logger_name: str):
 
 
 app_logger = setup_logger(
-        logger_name="app_logger",
-        log_level=logging.INFO,
-        only_log_to_console=True
-    )
+    logger_name="app_logger",
+    log_level=logging.INFO,
+    only_log_to_console=True
+)

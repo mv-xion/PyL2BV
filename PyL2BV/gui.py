@@ -5,13 +5,13 @@
 import logging
 import os
 import threading
-import time
 import webbrowser
 import tkinter as tk
 from tkinter import filedialog, ttk
 
-from datetime import datetime
-from pyl2bv_code.model_runner import run_retrieval
+from PyL2BV.pyl2bv_code.model_runner import run_retrieval
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
 
 app_logger = logging.getLogger("app_logger")  # Retrieve the logger by name
 
