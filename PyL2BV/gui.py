@@ -48,7 +48,7 @@ class SimpleGUI(tk.Tk):
         self.label_input_type.grid(row=0, column=3, padx=5, pady=5)
 
         self.input_type_var = tk.StringVar(self)
-        self.input_type_var.set("CHIME netCDF")  # Default option
+        self.input_type_var.set("ENVI Standard")  # Default option
         self.input_type_dropdown = ttk.Combobox(
             self,
             textvariable=self.input_type_var,
