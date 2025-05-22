@@ -5,13 +5,13 @@
 import logging
 import os
 import threading
-import time
 import webbrowser
 import tkinter as tk
 from tkinter import filedialog, ttk
 
-from datetime import datetime
-from pyl2bv_code.model_runner import run_retrieval
+from PyL2BV.pyl2bv_code.model_runner import run_retrieval
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
 
 app_logger = logging.getLogger("app_logger")  # Retrieve the logger by name
 
@@ -253,6 +253,20 @@ class SimpleGUI(tk.Tk):
         else:
             self.on_model_thread_complete()
 
+    def display_plot_in_window(self, image, title="Plot", cmap="viridis"):
+        window = tk.Toplevel(self)
+        window.title(title)
+
+        fig = Figure(figsize=(6, 4))
+        ax = fig.add_subplot(111)
+        cax = ax.imshow(image, cmap=cmap)
+        fig.colorbar(cax)
+        ax.set_title(title)
+
+        canvas = FigureCanvasTkAgg(fig, master=window)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
     def on_model_thread_complete(self):
         # Stop the progress bar
         self.progress_bar.stop()
@@ -284,21 +298,26 @@ class SimpleGUI(tk.Tk):
         :return: Shows completion message and is able to run again
         """
 
-        completion_message = run_retrieval(
-            input_folder_path,
-            input_type,
-            model_folder_path,
-            conversion_factor,
-            chunk_size,
-            self.show_message,
-            plotting,
-            debug_log,
+        result = run_retrieval(
+            input_folder_path=input_folder_path,
+            input_type=input_type,
+            model_folder_path=model_folder_path,
+            conversion_factor=conversion_factor,
+            chunk_size=chunk_size,
+            show_message_callback=self.show_message,
+            plotting=plotting,
+            debug_log=debug_log,
         )
 
-        self.progress_label.config(text=completion_message)
+        # Safely update the GUI
+        self.after(0, self.on_model_thread_complete)
+        self.after(0, self.show_message, result.message)
+        self.after(0, self.progress_label.config, {"text": result.message})
 
-        # Schedule the display of the completion message in the main thread
-        self.after(0, self.show_message, completion_message)
+        if result.success and result.plots:
+            for img, title, cmap in result.plots:
+                self.after(0, lambda i=img, t=title, c=cmap: self.display_plot_in_window(i, t, c))
+
 
     def show_message(self, message):
         self.text_widget.insert(tk.END, message + "\n")

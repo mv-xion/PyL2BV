@@ -70,7 +70,7 @@ from PyL2BV.pyl2bv_code.model_runner import run_retrieval
 # Define the input folder path
 input_folder_path = "/path/to/your/input_folder"
 # Define the input type (assuming it's a required argument)
-input_type = "CHIME netCDF"
+input_type = "ENVI Standard"
 # Define the model folder path
 model_folder_path = "/path/to/your/model_folder"
 # Define the conversion factor (example value, replace with actual if needed)
@@ -95,7 +95,7 @@ run_retrieval(
 You can also run the model using the CLI. Below is an example of how to use it:
 
 ```sh
-python -m PyL2BV.cli /path/to/your/input/folder "CHIME netCDF" /path/to/your/model/folder 0.0001 300 --plot
+python -m PyL2BV.cli /path/to/your/input/folder "ENVI Standard" /path/to/your/model/folder 0.0001 300 --plot
 ```
 
 The CLI accepts the following arguments:

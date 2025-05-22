@@ -1,5 +1,6 @@
 import argparse
-from .pyl2bv_code.model_runner import run_retrieval
+import matplotlib.pyplot as plt
+from PyL2BV.pyl2bv_code.model_runner import run_retrieval
 
 
 def main():
@@ -42,7 +43,7 @@ def main():
 
     args = parser.parse_args()
 
-    completion_message = run_retrieval(
+    result = run_retrieval(
         input_folder_path=args.input_folder_path,
         input_type=args.input_type,
         model_folder_path=args.model_folder_path,
@@ -52,6 +53,14 @@ def main():
         plotting=args.plot,
         debug_log=args.debug_log
     )
+
+    if result.success and result.plots and args.plot:
+        for img, title, cmap in result.plots:
+            plt.imshow(img, cmap=cmap)
+            plt.title(title)
+            plt.colorbar()
+            plt.tight_layout()
+            plt.show()
 
 
 if __name__ == "__main__":

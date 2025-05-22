@@ -5,11 +5,9 @@
 
 import logging
 import os
-
-import matplotlib.pyplot as plt
 import numpy as np
 
-# Importing packages
+from typing import Tuple
 from netCDF4 import Dataset
 from pyproj import Proj
 from spectral.io.envi import open
@@ -154,15 +152,16 @@ def get_lat_lon_envi(map_info: dict, lon: list, lat: list) -> tuple:
 # ________________________ Plotting images ________________________
 
 
-def show_reflectance_img(data_refl: np.ndarray, data_wavelength: np.ndarray):
+def show_reflectance_img(data_refl: np.ndarray, data_wavelength: np.ndarray) -> Tuple[np.ndarray, str, str]:
     """
     Showing the image read
     :param data_refl: data cube of reflectance (y,x,dim)
     :param data_wavelength: list of wavelengths
     :return: no return value just plotting the image
     """
-    image_logger.info("Plotting the input image")
-    # Defining wavelength RGB
+    image_logger.info("Preparing reflectance image (RGB)")
+
+    # Define target wavelengths for RGB
     values_to_find = np.array([639, 547, 463])
 
     # Find the index closest to each value using broadcasting and argmin
@@ -176,8 +175,4 @@ def show_reflectance_img(data_refl: np.ndarray, data_wavelength: np.ndarray):
         np.max(data_r_for_show) - np.min(data_r_for_show)
     )
 
-    # Showing the image
-    plt.imshow(data_r_for_show_norm, interpolation="nearest")
-    plt.title("Reflectance image (RGB)")
-    plt.colorbar()
-    plt.show()
+    return data_r_for_show_norm, "Reflectance image (RGB)", "viridis"
