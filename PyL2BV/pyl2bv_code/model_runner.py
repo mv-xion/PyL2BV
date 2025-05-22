@@ -5,15 +5,15 @@ app_logger = logging.getLogger("app_logger")  # Retrieve the logger by name
 
 
 def run_retrieval(
-    input_folder_path: str,
-    input_type: str,
-    model_folder_path: str,
-    conversion_factor: float = 0.0001,
-    chunk_size: int = 300,
-    show_message_callback = None,  # Optional callback for GUI messages
-    plotting: bool = False,
-    debug_log: bool = False,
-):
+        input_folder_path: str,
+        input_type: str,
+        model_folder_path: str,
+        conversion_factor: float = 0.0001,
+        chunk_size: int = 300,
+        show_message_callback=None,  # Optional callback for GUI messages
+        plotting: bool = False,
+        debug_log: bool = False,
+) -> RetrievalResult:
     """
     Runs the retrieval function, shared between CLI and GUI.
     :param input_folder_path: path to the input folder
@@ -27,26 +27,25 @@ def run_retrieval(
     :return: Completion message
     """
     app_logger.info("Starting retrieval.")
+    try:
+        result = pyl2bv_processing(
+            input_folder_path,
+            input_type,
+            model_folder_path,
+            conversion_factor,
+            chunk_size,
+            show_message_callback,
+            plotting,
+            debug_log,
+        )
 
-    message = pyl2bv_processing(
-        input_folder_path,
-        input_type,
-        model_folder_path,
-        conversion_factor,
-        chunk_size,
-        show_message_callback,
-        plotting,
-        debug_log,
-    )
+        if not result.success:
+            app_logger.error(result.message)
+        else:
+            app_logger.info(result.message)
+        return result
 
-    if message == 1:
-        completion_message = "Something went wrong"
-        app_logger.error(completion_message)
-    elif message == 0:
-        completion_message = "Model ran successfully"
-        app_logger.info(completion_message)
-    else:
-        completion_message = "Unknown error"
-        app_logger.warning(completion_message)
-
-    return completion_message
+    except Exception as e:
+        message = f"Error in preprocessing: {e}"
+        app_logger.error(message)
+        return RetrievalResult(success=False, message="Something went wrong", plots=None)
