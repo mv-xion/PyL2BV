@@ -3,12 +3,13 @@ name = "pyl2bv"
 version = "1.1.2"
 description = "Package for vegetation trait retrievals with ARTMO-based GPR models from hyperspectral images."
 authors = [
-    { name = "Viktor Ixion Mészáros", email = "xixion2@gmail.com" }
+    { name = "Viktor Ixion Mészáros", email = "xixion2@gmail.com" },
+    { name = "Louis Trinkle" },
+    { name = "Dávid D.Kovács" }
 ]
 readme = "README.md"
-license = { text = "MIT License" }
 requires-python = ">=3.10"
-keywords = ["hyperspectral", "vegetation", "retrieval", "GPR", "ARTMO"]
+keywords = ["vegetation", "retrieval", "ARTMO", "GPR", "hyperspectral"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -36,3 +37,5 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry.scripts]
 pyl2bv-cli = "PyL2BV.cli:main"
 pyl2bv-gui = "PyL2BV.gui:main"
+
+
