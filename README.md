@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/mv-xion/PyL2BV/main/docs/logo.png" alt="Logo" width="200"/> 
+<img src="https://github.com/mv-xion/PyL2BV/blob/main/docs/logo.png" alt="Logo" width="200"/> 
 
 # PyL2BV
 ## Overview
