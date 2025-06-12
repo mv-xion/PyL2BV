@@ -1,46 +1,173 @@
+<img src="https://github.com/mv-xion/PyL2BV/blob/main/docs/logo.png" alt="Logo" width="200"/> 
+
 # PyL2BV
- Next implementation of the BioRetrieval PyL2BV program,
- which stands for Python Level 2B Vegetation.
+## Overview
+  **PyL2BV** (Python Level 2B Vegetation) is a Python package for processing 
+  **ARTMO-based Gaussian Process Regression (GPR) models** on hyperspectral images.
+   It enables biophysical parameter retrieval using machine learning models.
 
-# Installation Guide
+## Key Features
+- **Process hyperspectral images** (ENVI Standard, CHIME netCDF)
+- **Gaussian Process Regression (GPR)** for vegetation parameters
+- **Command-Line Interface (CLI) and Graphical User Interface (GUI)**
+- **Customizable chunk-based retrieval**
+- **Supports large-scale image processing with parallelization**
+- **Automated ENVI file and NetCDF exports**
 
-## Prerequisites
+## Installation Guide
 
-Ensure you have Python 3.10.12 installed on your system.
+### **Prerequisites**
+Ensure you have Python **3.10 or later** installed on your system.
+
+### **Install via PyPI**
+```sh
+pip install PyL2BV
+```
+### **Usage**
+```sh
+# Check installation
+pip show pyl2bv
+# Invoke the GUI (details descibed below)
+pyl2bv-gui (details descibed below)
+# Invoke CLI
+pyl2bv-cli --help
+```
+
+## **(For Developers) Install the package directly from GitHub using pip:**
+
+```sh
+pip install git+https://github.com/mv-xion/PyL2BV.git
+```
 
 ## Creating a Virtual Environment
 
 ### Using `venv`
 
-1. Create a virtual environment:
-    ```bash
-    python3 -m venv myenv
-    ```
-2. Activate the virtual environment:
-    - On macOS/Linux:
-        ```bash
-        source myenv/bin/activate
-        ```
-    - On Windows:
-        ```powershell
-        .\myenv\Scripts\activate
-        ```
-
+```bash
+# 1. Create a virtual environment
+   python -m venv pyl2bv_env
+# 2. Activate the virtual environment:
+   source pyl2bv_env/bin/activate  # macOS/Linux
+   pyl2bv_env\Scripts\activate    # Windows
+```
 ### Using `conda`
 
-1. Create a new conda environment:
-    ```bash
-    conda create --name myenv python=3.10.12
-    ```
-2. Activate the conda environment:
-    ```bash
-    conda activate myenv
-    ```
+```bash
+# 1. Create a new conda environment:
+   conda create --name pyl2bv_env python=3.10
+# 2. Activate the conda environment:
+   conda activate pyl2bv_env
+```
 
-## Installing Packages
+### Installing Side-Packages
 
 Once you have activated your virtual environment, install the necessary packages from `requirements.txt`:
 
 ```bash
 pip install -r requirements.txt
 ```
+
+## Usage
+
+### Using the Python API
+
+Use PyL2BV in Python scripts, below is an example:
+
+```python
+from PyL2BV.pyl2bv_code.model_runner import run_retrieval
+
+# Define the input folder path
+input_folder_path = "/path/to/your/input_folder"
+# Define the input type (assuming it's a required argument)
+input_type = "ENVI Standard"
+# Define the model folder path
+model_folder_path = "/path/to/your/model_folder"
+# Define the conversion factor (example value, replace with actual if needed)
+conversion_factor = 0.0001
+# Define the chunk size based on your memory (example value, replace with actual if needed)
+chunk_size = 300
+
+# Run the retrieval
+run_retrieval(
+    input_folder_path=input_folder_path,
+    input_type=input_type,
+    model_folder_path=model_folder_path,
+    conversion_factor=conversion_factor,
+    chunk_size=chunk_size,
+    plot=False,
+    debug_log=False,
+)
+```
+
+### Using the Command-Line Interface (CLI)
+
+You can also run the model using the CLI. Below is an example of how to use it:
+
+```sh
+# Installed form PyPi
+pyl2bv-cli /path/to/your/input/folder "ENVI Standard" /path/to/your/model/folder 0.0001 300 --plot
+# Installed from Github
+python -m PyL2BV.cli /path/to/your/input/folder "ENVI Standard" /path/to/your/model/folder 0.0001 300 --plot
+```
+
+The CLI accepts the following arguments:
+
+- `input_folder_path`: Path to the input folder
+- `input_type`: Type of input file
+- `model_folder_path`: Path to the model folder
+- `conversion_factor`: Image conversion factor
+- `chunk_size: Retrieval chunk size
+- `--plot`: Optional flag to enable plotting
+
+### GUI Usage
+
+![GUI Screenshot](https://github.com/mv-xion/PyL2BV/blob/main/docs/gui.png)
+
+The GUI allows the user to set the following parameters:
+- **Input Folder:** Select the folder containing the input files.
+- **Model Folder:** Choose the folder with the required model files.
+- **Input Type:** Specify the type of input (options include "CHIME netCDF" and "ENVI Standard").
+- **Conversion Factor:** Set the image conversion factor as needed.
+- **Chunk Size:** Set the optimal retrieval chunk size factor for your PC.
+- **Advanced Settings:** The "Plotting results" option can be toggled in this dropdown.
+
+#### Program Running
+
+When the "Run" button is pressed, the program begins retrieval and opens a progress window for tracking.
+
+![Program Running](https://github.com/mv-xion/PyL2BV/blob/main/docs/running.png)
+
+#### Outcomes
+
+Below are examples of outcome images generated by the program:
+
+![Outcome 1](https://github.com/mv-xion/PyL2BV/blob/main/docs/run_success.png) ![Outcome 2](https://github.com/mv-xion/PyL2BV/blob/main/docs/run_fail.png)
+
+After the progress window closes, the user can initiate another retrieval directly from the GUI.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Contributing to PyL2BV
+
+Thank you for your interest in contributing to **PyL2BV**!  
+We welcome contributions that help improve the project, whether it's fixing bugs, adding new features, or improving documentation.
+
+1. **Fork** the repository on GitHub.
+2. Create a new **branch** (`git checkout -b feature-name`)
+3. **Commit** changes
+4. **Push** to the branch
+5. Open a **Pull Request**
+
+## Support
+
+For issues, please open a [GitHub Issue](https://github.com/mv-xion/PyL2BV/issues). 
+
+## References
+
+[ARTMO Toolbox](https://artmotoolbox.com/) 
+
+
+
+

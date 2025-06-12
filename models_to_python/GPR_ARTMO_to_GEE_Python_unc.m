@@ -21,9 +21,7 @@ model   = load(model_mat_f);
 % Edit for PCA
 ispca = isfield(model.modelo.model.pca, 'model');
 if ispca
-    % temporary solution with chime code
-    addpath(genpath('E:\CHIME\chime\auxiliar_class\ipl_tools\'));
-    %tmp=SIMFEAT_AL.PCA
+    addpath('PCA/'); % needs PCA file from IPL SIMFEAT
     pca_mat = model.modelo.model.pca.model.basis;
     disp('PCA exists');
 end
