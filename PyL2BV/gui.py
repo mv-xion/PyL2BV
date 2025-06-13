@@ -300,21 +300,6 @@ class SimpleGUI(tk.Tk):
         :return: Shows completion message and is able to run again
         """
 
-        # Start tracing memory allocations
-        tracemalloc.start()
-
-        # List to store memory usage over time
-        memory_usage = []
-
-        def trace_memory():
-            current, peak = tracemalloc.get_traced_memory()
-            memory_usage.append((time.time(), current / 10**6, peak / 10**6))
-            self.after(100, trace_memory)  # Trace memory every 0.1 second
-
-        # Start tracing memory in the main thread
-        self.after(100, trace_memory)
-
-
         result = run_retrieval(
             input_folder_path=input_folder_path,
             input_type=input_type,
@@ -325,30 +310,6 @@ class SimpleGUI(tk.Tk):
             plotting=plotting,
             debug_log=debug_log,
         )
-
-        # Stop tracing memory allocations
-        tracemalloc.stop()
-
-        # Log the memory usage
-        for timestamp, current, peak in memory_usage:
-            logging.info(f"Time: {timestamp}, Current memory usage: {current} MB, Peak memory usage: {peak} MB")
-
-        # Plot the memory usage over time
-        try:
-            import matplotlib.pyplot as plt
-
-            times, currents, peaks = zip(*memory_usage)
-            plt.figure(figsize=(10, 5))
-            plt.plot(times, currents, label='Current Memory Usage (MB)')
-            plt.plot(times, peaks, label='Peak Memory Usage (MB)')
-            plt.xlabel('Time (s)')
-            plt.ylabel('Memory Usage (MB)')
-            plt.title('Memory Usage Over Time')
-            plt.legend()
-            plt.show()
-        except ImportError:
-            logging.warning("matplotlib is not installed. Memory usage plot will not be displayed.")
-
 
         # Safely update the GUI
         self.after(0, self.on_model_thread_complete)
