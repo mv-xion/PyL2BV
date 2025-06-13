@@ -151,7 +151,7 @@ After the progress window closes, the user can initiate another retrieval direct
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details.
 
 ## Contributing to PyL2BV
 
