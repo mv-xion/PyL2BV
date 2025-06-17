@@ -7,7 +7,7 @@
    It enables biophysical parameter retrieval using machine learning models.
 
 ## Citation
-Mészáros Viktor Ixion (2025). pyl2bv (zenodo). Zenodo: https://doi.org/10.5281/zenodo.15655521
+Viktor Ixion Mészáros (2025). pyl2bv (zenodo). Zenodo: https://doi.org/10.5281/zenodo.15655521
 [![DOI](https://zenodo.org/badge/862335488.svg)](https://doi.org/10.5281/zenodo.15655521)
 
 ## Key Features
@@ -171,6 +171,10 @@ For issues, please open a [GitHub Issue](https://github.com/mv-xion/PyL2BV/issue
 ## References
 
 [ARTMO Toolbox](https://artmotoolbox.com/) 
+
+![Flexinel](https://raw.githubusercontent.com/mv-xion/PyL2BV/main/docs/flexinel_logo.png)
+Supported by the European Union (European Research Council, FLEXINEL, 101086622) project.
+
 
 
 
