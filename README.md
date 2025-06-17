@@ -172,7 +172,7 @@ For issues, please open a [GitHub Issue](https://github.com/mv-xion/PyL2BV/issue
 
 [ARTMO Toolbox](https://artmotoolbox.com/) 
 
-![Flexinel](https://raw.githubusercontent.com/mv-xion/PyL2BV/main/docs/flexinel_logo.png)
+<img src="https://raw.githubusercontent.com/mv-xion/PyL2BV/main/docs/flexinel_logo.png" alt="flexinel" width="600"/>
 Supported by the European Union (European Research Council, FLEXINEL, 101086622) project.
 
 
